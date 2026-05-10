@@ -1,29 +1,30 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
-export default function SearchPage() {
+// 1. Tách toàn bộ logic tìm kiếm vào Component này
+function SearchResults() {
   const searchParams = useSearchParams();
-  const queryParam = searchParams.get("q") || "";
+  const queryParam = searchParams.get("q") || ""; // Dùng "q" giống code cũ của bạn
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const [keyword, setKeyword] = useState(queryParam);
   const [isLoading, setIsLoading] = useState(false);
+  const [keyword, setKeyword] = useState(queryParam);
 
-  // Cập nhật keyword trên thanh Navbar cho khớp với URL
+  // Đồng bộ ô input trên Navbar với URL
   useEffect(() => {
     setKeyword(queryParam);
   }, [queryParam]);
 
-  // Gọi API tìm kiếm thực tế xuống Backend
+  // Gọi API tìm kiếm
   useEffect(() => {
     const fetchSearchResults = async () => {
       if (!queryParam.trim()) {
@@ -47,7 +48,7 @@ export default function SearchPage() {
   }, [queryParam]);
 
   return (
-    <main className="bg-black min-h-screen text-white flex flex-col">
+    <>
       <Navbar keyword={keyword} setKeyword={setKeyword} />
 
       <div className="flex-1 px-6 md:px-12 pt-32 pb-12">
@@ -82,7 +83,21 @@ export default function SearchPage() {
         movie={selectedMovie}
         onClose={() => setSelectedMovie(null)}
       />
+    </>
+  );
+}
 
+// 2. Export chính chỉ làm nhiệm vụ bọc Suspense để Vercel không báo lỗi
+export default function SearchPage() {
+  return (
+    <main className="bg-black min-h-screen text-white flex flex-col">
+      <Suspense fallback={
+        <div className="bg-black min-h-screen text-white flex items-center justify-center">
+          <p>Đang chuẩn bị trang tìm kiếm...</p>
+        </div>
+      }>
+        <SearchResults />
+      </Suspense>
       <Footer />
     </main>
   );
