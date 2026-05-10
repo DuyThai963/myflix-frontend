@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "DT MyFlix",
-  description: "Ahihi",
+  description: "Personal Streaming App by Duy Thái",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DT MyFlix",
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +34,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <meta name="theme-color" content="#000000" />
+      </head>
+      <body className="min-h-full flex flex-col bg-black">{children}</body>
     </html>
   );
 }

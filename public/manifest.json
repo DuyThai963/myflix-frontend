@@ -1,0 +1,21 @@
+{
+  "name": "MyFlix Duy Thái",
+  "short_name": "MyFlix",
+  "description": "Personal Streaming App by Duy Thái",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#e50914",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
