@@ -11,7 +11,7 @@ export default function Footer() {
         </p>
 
         <p className="text-sm mt-2">
-          Personal Streaming App
+          Lê Nguyễn Bảo Trân
         </p>
       </div>
     </footer>

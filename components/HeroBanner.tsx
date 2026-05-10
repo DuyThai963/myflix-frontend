@@ -1,4 +1,5 @@
 import { Movie } from "@/types/movie";
+import { BsFillPlayFill } from "react-icons/bs";
 
 type Props = {
   movie: Movie;
@@ -24,9 +25,13 @@ export default function HeroBanner({ movie }: Props) {
         </p>
 
         <div className="flex gap-4">
-          <button className="bg-white text-black px-6 py-3 rounded font-semibold hover:bg-gray-300">
-            ▶ Play
-          </button>
+        <button 
+          className="group relative flex items-center justify-center gap-2 bg-white text-black px-8 py-3 rounded-md transition-all duration-200 hover:bg-opacity-80 active:scale-95 cursor-pointer border-none outline-none"
+          style={{ isolation: 'isolate' }}
+        >
+          <BsFillPlayFill size={30} className="text-black" />
+          <span className="text-xl font-bold uppercase tracking-wide">Play</span>
+        </button>
 
           <button className="bg-gray-500/70 px-6 py-3 rounded font-semibold hover:bg-gray-500">
             More Info

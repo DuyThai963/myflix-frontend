@@ -8,7 +8,7 @@ type Props = {
   title: string;
   movies: Movie[];
   onSelectMovie: (movie: Movie) => void;
-  onRemoveMovie?: (movieId: string | number) => void; // Thêm prop này
+  onRemoveMovie?: (movieId: string | number) => void;
 };
 
 export default function MovieRow({
@@ -21,79 +21,43 @@ export default function MovieRow({
 
   const scroll = (direction: "left" | "right") => {
     if (!rowRef.current) return;
+    // Chỉnh khoảng cách cuộn ngắn lại cho phù hợp với card dọc
     rowRef.current.scrollBy({
-      left: direction === "left" ? -800 : 800,
+      left: direction === "left" ? -500 : 500,
       behavior: "smooth",
     });
   };
 
   return (
-    <section className="px-6 md:px-12 mt-12 relative">
-      <h2 className="text-2xl font-bold mb-4">{title}</h2>
+    <section className="px-6 md:px-12 mt-12 relative group/row">
+      <h2 className="text-2xl font-bold mb-4 text-white">{title}</h2>
 
+      {/* Nút cuộn trái - Chỉ hiện khi hover vào hàng */}
       <button
         onClick={() => scroll("left")}
-        className="
-          absolute
-          left-2
-          top-1/2
-          -translate-y-1/2
-          z-20
-          bg-black/60
-          hover:bg-black
-          w-10
-          h-20
-          text-white
-          hidden
-          md:flex
-          items-center
-          justify-center
-        "
+        className="absolute left-2 top-[55%] -translate-y-1/2 z-40 bg-black/60 hover:bg-black w-10 h-32 text-white hidden md:flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
       >
         ‹
       </button>
 
+      {/* Nút cuộn phải - Chỉ hiện khi hover vào hàng */}
       <button
         onClick={() => scroll("right")}
-        className="
-          absolute
-          right-2
-          top-1/2
-          -translate-y-1/2
-          z-20
-          bg-black/60
-          hover:bg-black
-          w-10
-          h-20
-          text-white
-          hidden
-          md:flex
-          items-center
-          justify-center
-        "
+        className="absolute right-2 top-[55%] -translate-y-1/2 z-40 bg-black/60 hover:bg-black w-10 h-32 text-white hidden md:flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
       >
         ›
       </button>
 
       <div
         ref={rowRef}
-        className="
-          flex
-          gap-4
-          overflow-x-auto
-          scroll-smooth
-          pb-4
-        "
-        style={{
-          scrollbarWidth: "none",
-        }}
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-10 pt-4"
+        style={{ scrollbarWidth: "none" }}
       >
         {movies.map((movie) => (
-          // Thêm thẻ div bọc ngoài này để giữ nguyên kích thước khi cuộn ngang ở trang Home
-          <div 
-            key={movie.id} 
-            className="flex-none w-[200px] sm:w-[240px] md:w-[280px] lg:w-[320px]"
-          >
+             <div 
+                key={movie.id} 
+                className="flex-none w-[160px] sm:w-[180px] md:w-[200px] lg:w-[220px]" 
+              >
             <MovieCard
               movie={movie}
               onClick={() => onSelectMovie(movie)}

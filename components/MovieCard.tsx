@@ -10,11 +10,11 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
   return (
     <div
       onClick={onClick}
+      style={{ aspectRation: "2/3" }}
       className="
         relative
-        w-full /* Đổi thành w-full để nó tự co giãn theo thẻ cha */
-        h-full /* Thêm h-full */
-        aspect-video
+        w-full 
+        aspect-[2/3] 
         rounded-md
         overflow-hidden
         transition-all
@@ -38,7 +38,6 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         "
       />
 
-      {/* Nút X xóa khỏi lịch sử */}
       {onRemove && (
         <button
           onClick={(e) => {
@@ -75,24 +74,26 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
           inset-0
           bg-gradient-to-t
           from-black/90
-          via-black/40
+          via-transparent
           to-transparent
-          opacity-0
-          hover:opacity-100
+          /* Mobile thì hiện luôn, Desktop thì mới cần hover */
+          opacity-100 
+          md:opacity-0
+          md:group-hover:opacity-100
           transition-opacity
           duration-300
           flex
           flex-col
           justify-end
-          p-4
+          p-2
         "
       >
         <div>
-          <h3 className="font-bold text-sm md:text-base text-white truncate drop-shadow-md">
+          <h3 className="font-bold text-sm text-white truncate drop-shadow-md">
             {movie.title}
           </h3>
 
-          <p className="text-xs text-gray-300 mt-1 font-medium drop-shadow-md">
+          <p className="text-[10px] text-gray-300 mt-1 font-medium drop-shadow-md">
             <span className="text-green-500 font-bold mr-2">{movie.year}</span> 
             {movie.genre}
           </p>
