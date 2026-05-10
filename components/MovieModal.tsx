@@ -1,0 +1,274 @@
+"use client";
+
+import { Movie, Episode } from "@/types/movie";
+import VideoPlayer from "./VideoPlayer";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { movieService } from "@/services/movie.service";
+
+type Props = {
+  movie: Movie | null;
+  onClose: () => void;
+};
+
+export default function MovieModal({ movie, onClose }: Props) {
+  const [streamUrl, setStreamUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [activeEpisode, setActiveEpisode] = useState("");
+  const [activeEpisodeName, setActiveEpisodeName] = useState("");
+  const [isInMyList, setIsInMyList] = useState(false);
+
+  useEffect(() => {
+    if (!movie) return;
+    try {
+      const myListData = localStorage.getItem("myflix_mylist");
+      if (myListData) {
+        const myList = JSON.parse(myListData);
+        const isExist = myList.some((m: any) => m.id === movie.id);
+        setIsInMyList(isExist);
+      }
+    } catch (e) {}
+  }, [movie]);
+
+  const toggleMyList = () => {
+    if (!movie) return;
+    try {
+      const myListData = localStorage.getItem("myflix_mylist");
+      let myList = myListData ? JSON.parse(myListData) : [];
+
+      if (isInMyList) {
+        // Xóa khỏi list
+        myList = myList.filter((m: any) => m.id !== movie.id);
+        setIsInMyList(false);
+      } else {
+        // Thêm vào list (đẩy lên đầu)
+        myList.unshift(movie);
+        setIsInMyList(true);
+      }
+      localStorage.setItem("myflix_mylist", JSON.stringify(myList));
+      // Bắn event để trang khác (nếu có) tự update
+      window.dispatchEvent(new Event("myflix_mylist_updated"));
+    } catch (e) {
+      console.error("Lỗi cập nhật My List", e);
+    }
+  };
+
+  useEffect(() => {
+    const fetchFullDetail = async () => {
+      if (!movie?.slug) return;
+      setLoading(true);
+      try {
+        const data = await movieService.getMovieDetail(movie.slug);
+        if (data && data.episodes) {
+          const serverData = data.episodes[0]?.server_data || [];
+          setEpisodes(serverData);
+
+          if (serverData.length > 0) {
+            // Kiểm tra xem phim này đã xem dở tập nào chưa
+            let startEpisode = serverData[0];
+            try {
+               const historyData = localStorage.getItem("myflix_history");
+               if(historyData){
+                   const history = JSON.parse(historyData);
+                   // Tìm xem phim này (theo id) đã có lịch sử chưa
+                   const movieHistory = history.find((h: any) => h.movie.id === movie.id);
+                   if(movieHistory) {
+                       // Nếu có, tìm cái tập tương ứng trong serverData
+                       const foundEp = serverData.find((ep: any) => ep.slug === movieHistory.episodeSlug);
+                       if(foundEp) startEpisode = foundEp;
+                   }
+               }
+            } catch(e) {}
+
+            const targetUrl = startEpisode.link_m3u8 || startEpisode.link_embed;
+            if (targetUrl && targetUrl.trim() !== "") {
+              setStreamUrl(targetUrl);
+              setActiveEpisode(startEpisode.slug);
+              setActiveEpisodeName(startEpisode.name);
+            } else {
+              setStreamUrl("");
+            }
+          } else {
+            setStreamUrl("");
+          }
+        } else {
+          setStreamUrl("");
+        }
+      } catch (error) {
+        console.error("LỖI KHI FETCH:", error);
+        setStreamUrl("");
+      } finally {
+        setTimeout(() => setLoading(false), 500);
+      }
+    };
+    fetchFullDetail();
+  }, [movie]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Hàm xử lý lưu lịch sử
+  const handleProgress = (currentTime: number) => {
+    if (!movie || !activeEpisode) return;
+
+    try {
+      const historyData = localStorage.getItem("myflix_history");
+      let history = historyData ? JSON.parse(historyData) : [];
+
+      const currentWatch = {
+        watchId: `${movie.id}-${activeEpisode}`, // ID duy nhất cho tập phim này
+        movie: movie, // Lưu toàn bộ data phim để render ngoài trang chủ
+        episodeSlug: activeEpisode,
+        episodeName: activeEpisodeName,
+        currentTime: currentTime,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Xóa phim này khỏi mảng (nếu đã có) để đẩy lên đầu
+      history = history.filter((h: any) => h.movie.id !== movie.id);
+      
+      // Thêm vào đầu mảng (chỉ giữ khoảng 20 phim gần nhất cho nhẹ)
+      history.unshift(currentWatch);
+      if (history.length > 20) history.pop();
+
+      localStorage.setItem("myflix_history", JSON.stringify(history));
+    } catch (e) {
+      console.error("Lỗi lưu lịch sử", e);
+    }
+  };
+
+  if (!movie) return null;
+
+  return (
+    <motion.div
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-4 backdrop-blur-sm"
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-zinc-950 rounded-xl overflow-hidden w-full max-w-5xl max-h-[95vh] flex flex-col relative border border-zinc-800 shadow-2xl"
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 z-[100] bg-black/60 w-10 h-10 rounded-full hover:bg-white hover:text-black transition flex items-center justify-center text-xl"
+        >
+          ✕
+        </button>
+
+        {/* Player Section */}
+        <div className="aspect-video bg-black w-full relative">
+          {loading ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="w-10 h-10 border-4 border-zinc-700 border-t-red-600 rounded-full animate-spin" />
+            </div>
+          ) : streamUrl ? (
+            <VideoPlayer 
+               src={streamUrl} 
+               movieId={`${movie.id}-${activeEpisode}`} 
+               onProgress={handleProgress} // Truyền hàm xuống Player
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50">
+              <span className="text-4xl mb-2">⚠️</span>
+              <p>Nguồn phát hiện tại chưa khả dụng hoặc chỉ có Trailer</p>
+            </div>
+          )}
+        </div>
+
+        {/* Content Section */}
+        <div className="p-6 md:p-8 overflow-y-auto">
+          <div className="flex flex-col md:flex-row justify-between gap-8">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-white leading-tight">
+                {movie.title}
+              </h1>
+              
+              <div className="flex flex-wrap items-center gap-4 text-sm font-medium mb-6">
+                <span className="text-green-500 font-bold">{movie.year}</span>
+                <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{movie.duration}</span>
+                <span className="text-zinc-400">{movie.genre}</span>
+                <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
+              </div>
+
+              {/* NÚT MY LIST ĐƯỢC CHÈN Ở ĐÂY */}
+              <div className="mb-6 flex items-center gap-4">
+                <button
+                  onClick={toggleMyList}
+                  className="
+                    flex items-center justify-center gap-2 
+                    bg-zinc-800/80 hover:bg-zinc-700 text-white 
+                    px-4 py-2 rounded-md font-bold transition
+                    border border-zinc-700 hover:border-white
+                  "
+                >
+                  {isInMyList ? (
+                    <>
+                      <span className="text-xl">✓</span>
+                      <span>Đã lưu vào danh sách</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xl">+</span>
+                      <span>Thêm vào danh sách</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <p className="text-zinc-400 leading-relaxed text-base md:text-lg">
+                {movie.description || "Chưa có mô tả cho bộ phim này."}
+              </p>
+            </div>
+
+            {/* Episode Selector */}
+            {episodes.length > 0 && (
+              <div className="md:w-80 w-full shrink-0">
+                <h3 className="text-sm font-bold mb-4 text-zinc-500 uppercase tracking-widest">
+                  Danh sách tập ({episodes.length})
+                </h3>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                {episodes.map((ep, idx) => {
+                  const isPlayable = ep.link_m3u8 && ep.link_m3u8.trim() !== "";
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!isPlayable}
+                      onClick={() => {
+                        if (ep.link_m3u8 || ep.link_embed) {
+                          setStreamUrl(ep.link_m3u8 || ep.link_embed);
+                          setActiveEpisode(ep.slug);
+                          setActiveEpisodeName(ep.name); // Lưu lại tên tập đang chọn
+                        } else {
+                          alert("Tập này không có link stream!");
+                        }
+                      }}
+                      className={`py-2 px-1 rounded text-xs font-bold transition truncate ${
+                        !isPlayable ? "opacity-20 cursor-not-allowed bg-zinc-900" :
+                        activeEpisode === ep.slug
+                          ? "bg-red-600 text-white"
+                          : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                      }`}
+                    >
+                      Tập {ep.name}
+                    </button>
+                  );
+                })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}

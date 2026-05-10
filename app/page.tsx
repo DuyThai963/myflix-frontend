@@ -1,65 +1,151 @@
-import Image from "next/image";
+"use client";
+
+import HeroBanner from "@/components/HeroBanner";
+import MovieModal from "@/components/MovieModal";
+import MovieRow from "@/components/MovieRow";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+
+import { Movie } from "@/types/movie";
+import { movieService } from "@/services/movie.service";
+
+import { useEffect, useMemo, useState } from "react";
 
 export default function Home() {
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [keyword, setKeyword] = useState("");
+  const [continueWatching, setContinueWatching] = useState<Movie[]>([]);
+  const [movies, setMovies] = useState<Movie[]>([]);
+
+  const filteredMovies = useMemo(() => {
+    return movies.filter((movie) =>
+      movie.title.toLowerCase().includes(keyword.toLowerCase())
+    );
+  }, [movies, keyword]);
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      const data = await movieService.getMovies();
+      setMovies(data);
+    };
+
+    fetchMovies();
+  }, []);
+
+  const loadHistory = () => {
+    try {
+      const historyData = localStorage.getItem("myflix_history");
+      if (historyData) {
+        const history = JSON.parse(historyData);
+        const historyMovies = history.map((h: any) => h.movie);
+        setContinueWatching(historyMovies);
+      } else {
+        setContinueWatching([]);
+      }
+    } catch (e) {
+      console.error("Lỗi đọc lịch sử", e);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+
+    const handleStorageChange = () => loadHistory();
+    window.addEventListener("myflix_history_updated", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("myflix_history_updated", handleStorageChange);
+    };
+  }, []);
+
+  // Hàm xử lý xóa phim khỏi lịch sử
+  const handleRemoveHistory = (movieId: string | number) => {
+    try {
+      const historyData = localStorage.getItem("myflix_history");
+      if (historyData) {
+        let history = JSON.parse(historyData);
+        // Lọc bỏ phim có id trùng khớp
+        history = history.filter((h: any) => h.movie.id !== movieId);
+        // Lưu lại vào localStorage
+        localStorage.setItem("myflix_history", JSON.stringify(history));
+        // Cập nhật lại UI ngay lập tức
+        loadHistory();
+      }
+    } catch (e) {
+      console.error("Lỗi xóa lịch sử", e);
+    }
+  };
+
+  const trendingMovies = filteredMovies.slice(0, 10);
+  const chineseMovies = filteredMovies.filter((movie) =>
+    movie.description?.toLowerCase().includes("china")
+  );
+  const actionMovies = filteredMovies.filter((movie) =>
+    movie.genre?.toLowerCase().includes("hành động")
+  );
+  const dramaMovies = filteredMovies.filter((movie) =>
+    movie.genre?.toLowerCase().includes("chính kịch")
+  );
+  const seriesMovies = filteredMovies.filter((movie) =>
+    movie.duration?.includes("tập")
+  );
+  const koreaMovies = filteredMovies.filter(
+    (movie) => movie.country === "Hàn Quốc"
+  );
+  const chinaMovies = filteredMovies.filter(
+    (movie) => movie.country === "Trung Quốc"
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="bg-black min-h-screen text-white">
+      <Navbar keyword={keyword} setKeyword={setKeyword} />
+
+      {movies.length > 0 && <HeroBanner movie={movies[0]} />}
+
+      <div className="-mt-24 relative z-20">
+        {continueWatching.length > 0 && (
+          <MovieRow
+            title="Continue Watching"
+            movies={continueWatching}
+            onSelectMovie={setSelectedMovie}
+            onRemoveMovie={handleRemoveHistory} // Chỉ truyền cho Row này
+          />
+        )}
+
+        <MovieRow
+          title="Trending Now"
+          movies={trendingMovies}
+          onSelectMovie={setSelectedMovie}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <MovieRow
+          title="Korean Shows"
+          movies={koreaMovies}
+          onSelectMovie={setSelectedMovie}
+        />
+
+        <MovieRow
+          title="Chinese Drama"
+          movies={chinaMovies}
+          onSelectMovie={setSelectedMovie}
+        />
+
+        <MovieRow
+          title="Drama"
+          movies={dramaMovies}
+          onSelectMovie={setSelectedMovie}
+        />
+      </div>
+
+      <MovieModal
+        movie={selectedMovie}
+        onClose={() => {
+          setSelectedMovie(null);
+          window.dispatchEvent(new Event("myflix_history_updated"));
+        }}
+      />
+
+      <Footer />
+    </main>
   );
 }
