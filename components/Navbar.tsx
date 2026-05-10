@@ -45,7 +45,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
   ];
 
   return (
-    <div className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${isScrolled || isMobileMenuOpen ? "bg-black" : "bg-gradient-to-b from-black/90 to-transparent"}`}>
+    <div className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled || isMobileMenuOpen ? "bg-black" : "bg-gradient-to-b from-black/90 to-transparent"}`}>
       <div className="flex items-center justify-between px-6 md:px-12 py-4">
         <div className="flex items-center gap-4 md:gap-8">
           {/* Nút 3 gạch cho Mobile */}
