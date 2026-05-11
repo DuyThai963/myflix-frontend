@@ -9,8 +9,37 @@ body {
 
 * {
   box-sizing: border-box;
+  /* Xóa highlight xanh khi chạm trên iPad/K9 */
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::-webkit-scrollbar {
   display: none;
+}
+
+/* 1. MẶC ĐỊNH (Dành cho iPad, Máy chiếu, Điện thoại - Coarse Pointer) */
+/* Dùng !important nhẹ để đảm bảo nó luôn hiện trên thiết bị cảm ứng */
+.info-overlay, .remove-btn {
+  opacity: 1 !important;
+}
+
+/* 2. DÀNH RIÊNG CHO MÁY TÍNH (Fine Pointer - Có chuột) */
+@media (pointer: fine) {
+  /* Ẩn đi khi ở trạng thái bình thường */
+  .info-overlay, .remove-btn {
+    opacity: 0 !important;
+  }
+  
+  /* Chỉ hiện khi di chuột (hover) vào thẻ cha có class 'group' */
+  .group:hover .info-overlay, 
+  .group:hover .remove-btn {
+    opacity: 1 !important;
+  }
+}
+
+/* Thêm cái này để iPad cuộn danh sách phim mượt như App */
+@media (pointer: coarse) {
+  html, body {
+    -webkit-overflow-scrolling: touch;
+  }
 }

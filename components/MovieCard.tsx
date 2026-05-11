@@ -10,7 +10,6 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
   return (
     <div
       onClick={onClick}
-      style={{ aspectRation: "2/3" }}
       className="
         relative
         w-full 
@@ -19,25 +18,21 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         overflow-hidden
         transition-all
         duration-300
-        hover:scale-105
-        hover:z-50
-        hover:shadow-2xl
+        /* Chỉ phóng to khi dùng chuột trên máy tính */
+        @media(pointer:fine){hover:scale-105 hover:z-50 hover:shadow-2xl}
         cursor-pointer
         bg-zinc-900
         group
       "
     >
+      {/* Poster phim */}
       <img
         src={movie.poster}
         alt={movie.title}
-        className="
-          w-full
-          h-full
-          object-cover
-          object-top
-        "
+        className="w-full h-full object-cover object-top"
       />
 
+      {/* Nút xóa - Class remove-btn để CSS điều khiển opacity */}
       {onRemove && (
         <button
           onClick={(e) => {
@@ -45,59 +40,33 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
             onRemove(e);
           }}
           className="
-            absolute
-            top-2
-            right-2
-            z-50
-            w-8
-            h-8
-            rounded-full
-            bg-black/60
-            text-white
-            flex
-            items-center
-            justify-center
-            transition-all
-            md:opacity-0
-            md:group-hover:opacity-100
-            opacity-100
-            hover:bg-red-600
-            active:scale-90
+            remove-btn
+            absolute top-2 right-2 z-50 w-8 h-8 rounded-full 
+            bg-black/70 text-white flex items-center justify-center 
+            transition-all duration-300 hover:bg-red-600 active:scale-90
           "
-          title="Xóa khỏi danh sách Đang xem"
         >
           ✕
         </button>
       )}
 
+      {/* Overlay thông tin - Class info-overlay để CSS điều khiển opacity */}
       <div
         className="
-          absolute
-          inset-0
-          bg-gradient-to-t
-          from-black/90
-          via-transparent
-          to-transparent
-          /* Mobile thì hiện luôn, Desktop thì mới cần hover */
-          opacity-100 
-          md:opacity-0
-          md:group-hover:opacity-100
-          transition-opacity
-          duration-300
-          flex
-          flex-col
-          justify-end
-          p-2
+          info-overlay
+          absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent
+          transition-opacity duration-300 flex flex-col justify-end p-2.5
         "
       >
-        <div>
-          <h3 className="font-bold text-sm text-white truncate drop-shadow-md">
+        <div className="transform transition-transform duration-300">
+          <h3 className="font-bold text-[13px] md:text-sm text-white truncate leading-tight drop-shadow-lg">
             {movie.title}
           </h3>
 
-          <p className="text-[10px] text-gray-300 mt-1 font-medium drop-shadow-md">
-            <span className="text-green-500 font-bold mr-2">{movie.year}</span> 
-            {movie.genre}
+          <p className="text-[10px] text-gray-300 mt-1 font-medium flex items-center gap-2">
+            <span className="text-green-500 font-bold">{movie.year}</span> 
+            <span className="opacity-60">|</span>
+            <span className="truncate">{movie.genre}</span>
           </p>
         </div>
       </div>
