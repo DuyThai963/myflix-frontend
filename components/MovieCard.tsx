@@ -57,10 +57,12 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
             flex
             items-center
             justify-center
-            opacity-0
-            group-hover:opacity-100
-            transition-opacity
+            transition-all
+            md:opacity-0
+            md:group-hover:opacity-100
+            opacity-100
             hover:bg-red-600
+            active:scale-90
           "
           title="Xóa khỏi danh sách Đang xem"
         >
