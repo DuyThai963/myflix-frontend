@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
   src: string;
   movieId: string | number;
-  onProgress?: (currentTime: number) => void; // Thêm prop này
+  onProgress?: (currentTime: number) => void;
 };
 
 export default function VideoPlayer({ src, movieId, onProgress }: Props) {
@@ -19,7 +19,6 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
     setLoading(true);
     const video = videoRef.current;
     
-    // Đọc thời gian đã lưu (chỉnh sửa một chút để đọc từ object)
     let savedTime = 0;
     try {
         const historyData = localStorage.getItem("myflix_history");
@@ -30,7 +29,21 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
         }
     } catch(e) {}
 
-    if (Hls.isSupported()) {
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      console.log("Dùng trình phát Native iOS (tối ưu cho tiết kiệm pin)");
+      video.src = src;
+      video.addEventListener('loadedmetadata', () => {
+        if (savedTime > 0) video.currentTime = savedTime;
+        video.play().catch(() => {});
+        setLoading(false);
+      }, { once: true });
+
+      return () => {
+        video.src = "";
+      }
+    } 
+    else if (Hls.isSupported()) {
+      console.log("Dùng thư viện Hls.js");
       const hls = new Hls();
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -40,9 +53,6 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
       });
 
       return () => hls.destroy();
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-      if (savedTime > 0) video.currentTime = savedTime;
     }
   }, [src, movieId]);
 
@@ -58,13 +68,14 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
         ref={videoRef}
         controls
         autoPlay
-        muted
+        playsInline={false} 
+        muted={true}
         className="w-full h-full"
         onLoadedData={() => setLoading(false)}
         onError={() => setLoading(false)}
         onTimeUpdate={(e) => {
           const currentTime = (e.target as HTMLVideoElement).currentTime;
-          if (onProgress) onProgress(currentTime); // Gọi ra ngoài
+          if (onProgress) onProgress(currentTime);
         }}
       />
     </div>
