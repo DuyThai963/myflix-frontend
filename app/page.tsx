@@ -5,6 +5,7 @@ import MovieModal from "@/components/MovieModal";
 import MovieRow from "@/components/MovieRow";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import LoadingIntro from "@/components/LoadingIntro";
 
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
@@ -23,10 +24,18 @@ export default function Home() {
     );
   }, [movies, keyword]);
 
+  const [isIntroLoading, setIsIntroLoading] = useState(true);
+
   useEffect(() => {
     const fetchMovies = async () => {
-      const data = await movieService.getMovies();
-      setMovies(data);
+      try {
+        const data = await movieService.getMovies();
+        setMovies(data);
+      } catch (error) {
+        console.error("Lỗi fetch movies", error);
+      } finally {
+        setTimeout(() => setIsIntroLoading(false), 1000); 
+      }
     };
 
     fetchMovies();
@@ -97,6 +106,9 @@ export default function Home() {
   );
 
   return (
+    <>
+    <LoadingIntro isLoading={isIntroLoading} />
+
     <main className="bg-black min-h-screen text-white">
       <Navbar keyword={keyword} setKeyword={setKeyword} />
 
@@ -147,5 +159,6 @@ export default function Home() {
 
       <Footer />
     </main>
+    </>
   );
 }
