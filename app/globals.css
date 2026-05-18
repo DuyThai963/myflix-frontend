@@ -5,6 +5,12 @@ body {
   background: black;
   color: white;
   overflow-x: hidden;
+  
+  /* CHỐNG ZOOM TOÀN DIỆN: Ép phẳng layout trên toàn bộ thiết bị */
+  touch-action: pan-x pan-y; 
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 * {
@@ -13,12 +19,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Ẩn thanh cuộn mặc định */
 ::-webkit-scrollbar {
   display: none;
 }
 
 /* 1. MẶC ĐỊNH (Dành cho iPad, Máy chiếu, Điện thoại - Coarse Pointer) */
-/* Dùng !important nhẹ để đảm bảo nó luôn hiện trên thiết bị cảm ứng */
 .info-overlay, .remove-btn {
   opacity: 1 !important;
 }
@@ -37,7 +43,7 @@ body {
   }
 }
 
-/* Thêm cái này để iPad cuộn danh sách phim mượt như App */
+/* 3. TỐI ƯU CUỘN CHO THIẾT BỊ CẢM ỨNG (iPad, Điện thoại) */
 @media (pointer: coarse) {
   html, body {
     -webkit-overflow-scrolling: touch;

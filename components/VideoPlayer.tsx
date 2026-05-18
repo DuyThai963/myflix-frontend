@@ -6,35 +6,31 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
   src: string;
   movieId: string | number;
+  isSeries?: boolean;      // TRUE nếu là phim tập, FALSE/undefined nếu là phim lẻ
+  onNext?: () => void;     // Hàm xử lý chuyển tập kế tiếp
   onProgress?: (currentTime: number) => void;
 };
 
-export default function VideoPlayer({ src, movieId, onProgress }: Props) {
+export default function VideoPlayer({ src, movieId, isSeries = false, onNext, onProgress }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // Ref cho container
+  const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(true);
+  const [showNextButton, setShowNextButton] = useState(false); // State quản lý nút Next
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Hàm xử lý hiện thanh điều khiển khi rê chuột (MouseMove)
   const handleUserInteraction = () => {
     setShowControls(true);
-    
-    // Xóa timeout cũ nếu người dùng vẫn đang di chuyển chuột
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
-    // Nếu sau 3 giây không động đậy chuột/remote thì mới ẩn
-    timeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
+    timeoutRef.current = setTimeout(() => setShowControls(false), 3000);
   };
 
   useEffect(() => {
     if (!videoRef.current || !src) return;
-
     setLoading(true);
-    const video = videoRef.current;
+    setShowNextButton(false); // Reset nút khi đổi tập/đổi phim
     
+    const video = videoRef.current;
     let savedTime = 0;
     try {
       const historyData = localStorage.getItem("myflix_history");
@@ -45,7 +41,6 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
       }
     } catch(e) {}
 
-    // Logic HLS giữ nguyên...
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
       video.addEventListener('loadedmetadata', () => {
@@ -84,20 +79,62 @@ export default function VideoPlayer({ src, movieId, onProgress }: Props) {
         ref={videoRef}
         controls={showControls} 
         autoPlay
-        playsInline={false} 
-        muted={true}
-        className="w-full h-full cursor-none"
-        style={{ cursor: showControls ? 'default' : 'none' }}
-        onLoadedData={() => setLoading(false)}
-        onError={() => setLoading(false)}
+        className="w-full h-full"
         onTimeUpdate={(e) => {
-          const currentTime = (e.target as HTMLVideoElement).currentTime;
+          const video = e.target as HTMLVideoElement;
+          const currentTime = video.currentTime;
+          const duration = video.duration;
+
           if (onProgress) onProgress(currentTime);
+
+          if (isSeries && duration > 0) {
+            const timeLeft = duration - currentTime;
+
+            let skipTime = 60;
+            if (duration > 3000) {
+              skipTime = 120;
+            } else if (duration > 1800) {
+              skipTime = 90;
+            }
+
+            if (timeLeft <= skipTime && timeLeft > 2) {
+              setShowNextButton(true);
+            } else {
+              setShowNextButton(false);
+            }
+          }
+        }}
+
+        onEnded={() => {
+          if (isSeries && onNext) {
+            onNext(); 
+          }
         }}
       />
 
-      {/* Lớp phủ hỗ trợ: Giúp nhận diện hover tốt hơn trên Android/Cốc Cốc */}
-      {!showControls && (
+      {/* UI NÚT "TẬP TIẾP THEO" CHUẨN NETFLIX (Góc dưới bên phải) */}
+      {showNextButton && onNext && (
+        <div className="absolute bottom-20 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onNext();
+            }}
+            className="group flex items-center gap-3 bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700 px-5 py-3 rounded shadow-2xl transition-all active:scale-95"
+          >
+            <div className="text-left">
+              <p className="text-white text-xs font-bold">Tập kế tiếp</p>
+            </div>
+            <div className="bg-white text-black p-1.5 rounded-sm group-hover:bg-red-600 group-hover:text-white transition-colors">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M6 18L14.5 12L6 6V18ZM16 6V18H18V6H16Z" />
+              </svg>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {!showControls && !showNextButton && (
         <div className="absolute inset-0 z-10" />
       )}
     </div>

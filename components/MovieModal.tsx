@@ -1,6 +1,6 @@
 "use client";
 
-import { Movie, Episode } from "@/types/movie";
+import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -38,16 +38,13 @@ export default function MovieModal({ movie, onClose }: Props) {
       let myList = myListData ? JSON.parse(myListData) : [];
 
       if (isInMyList) {
-        // Xóa khỏi list
         myList = myList.filter((m: any) => m.id !== movie.id);
         setIsInMyList(false);
       } else {
-        // Thêm vào list (đẩy lên đầu)
         myList.unshift(movie);
         setIsInMyList(true);
       }
       localStorage.setItem("myflix_mylist", JSON.stringify(myList));
-      // Bắn event để trang khác (nếu có) tự update
       window.dispatchEvent(new Event("myflix_mylist_updated"));
     } catch (e) {
       console.error("Lỗi cập nhật My List", e);
@@ -65,16 +62,13 @@ export default function MovieModal({ movie, onClose }: Props) {
           setEpisodes(serverData);
 
           if (serverData.length > 0) {
-            // Kiểm tra xem phim này đã xem dở tập nào chưa
             let startEpisode = serverData[0];
             try {
                const historyData = localStorage.getItem("myflix_history");
                if(historyData){
                    const history = JSON.parse(historyData);
-                   // Tìm xem phim này (theo id) đã có lịch sử chưa
                    const movieHistory = history.find((h: any) => h.movie.id === movie.id);
                    if(movieHistory) {
-                       // Nếu có, tìm cái tập tương ứng trong serverData
                        const foundEp = serverData.find((ep: any) => ep.slug === movieHistory.episodeSlug);
                        if(foundEp) startEpisode = foundEp;
                    }
@@ -113,7 +107,6 @@ export default function MovieModal({ movie, onClose }: Props) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Hàm xử lý lưu lịch sử
   const handleProgress = (currentTime: number) => {
     if (!movie || !activeEpisode) return;
 
@@ -122,18 +115,15 @@ export default function MovieModal({ movie, onClose }: Props) {
       let history = historyData ? JSON.parse(historyData) : [];
 
       const currentWatch = {
-        watchId: `${movie.id}-${activeEpisode}`, // ID duy nhất cho tập phim này
-        movie: movie, // Lưu toàn bộ data phim để render ngoài trang chủ
+        watchId: `${movie.id}-${activeEpisode}`,
+        movie: movie,
         episodeSlug: activeEpisode,
         episodeName: activeEpisodeName,
         currentTime: currentTime,
         updatedAt: new Date().toISOString()
       };
 
-      // Xóa phim này khỏi mảng (nếu đã có) để đẩy lên đầu
       history = history.filter((h: any) => h.movie.id !== movie.id);
-      
-      // Thêm vào đầu mảng (chỉ giữ khoảng 20 phim gần nhất cho nhẹ)
       history.unshift(currentWatch);
       if (history.length > 20) history.pop();
 
@@ -142,6 +132,30 @@ export default function MovieModal({ movie, onClose }: Props) {
       console.error("Lỗi lưu lịch sử", e);
     }
   };
+
+  // --- HÀM XỬ LÝ CHUYỂN TẬP TIẾP THEO THÔNG MINH ---
+  const handleNextEpisode = () => {
+    if (episodes.length <= 1) return; // Nếu phim lẻ hoặc chỉ có 1 tập thì không làm gì cả
+
+    // Tìm vị trí của tập hiện tại
+    const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
+    
+    // Nếu tìm thấy và chưa phải tập cuối cùng
+    if (currentIdx !== -1 && currentIdx < episodes.length - 1) {
+      const nextEp = episodes[currentIdx + 1];
+      const nextUrl = nextEp.link_m3u8 || nextEp.link_embed;
+
+      if (nextUrl && nextUrl.trim() !== "") {
+        setStreamUrl(nextUrl);
+        setActiveEpisode(nextEp.slug);
+        setActiveEpisodeName(nextEp.name);
+      }
+    }
+  };
+
+  // Kiểm tra xem phim hiện tại có tập kế tiếp hay không
+  const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
+  const hasNextEpisode = episodes.length > 1 && currentIdx !== -1 && currentIdx < episodes.length - 1;
 
   if (!movie) return null;
 
@@ -175,7 +189,11 @@ export default function MovieModal({ movie, onClose }: Props) {
             <VideoPlayer 
                src={streamUrl} 
                movieId={`${movie.id}-${activeEpisode}`} 
-               onProgress={handleProgress} // Truyền hàm xuống Player
+               onProgress={handleProgress}
+               /* Truyền trạng thái phim bộ (nếu tổng số tập > 1 và có tập tiếp theo) */
+               isSeries={hasNextEpisode} 
+               /* Truyền hàm chuyển tập xuống cho VideoPlayer */
+               onNext={handleNextEpisode} 
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50">
@@ -200,16 +218,10 @@ export default function MovieModal({ movie, onClose }: Props) {
                 <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
               </div>
 
-              {/* NÚT MY LIST ĐƯỢC CHÈN Ở ĐÂY */}
               <div className="mb-6 flex items-center gap-4">
                 <button
                   onClick={toggleMyList}
-                  className="
-                    flex items-center justify-center gap-2 
-                    bg-zinc-800/80 hover:bg-zinc-700 text-white 
-                    px-4 py-2 rounded-md font-bold transition
-                    border border-zinc-700 hover:border-white
-                  "
+                  className="flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2 rounded-md font-bold transition border border-zinc-700 hover:border-white"
                 >
                   {isInMyList ? (
                     <>
@@ -247,7 +259,7 @@ export default function MovieModal({ movie, onClose }: Props) {
                         if (ep.link_m3u8 || ep.link_embed) {
                           setStreamUrl(ep.link_m3u8 || ep.link_embed);
                           setActiveEpisode(ep.slug);
-                          setActiveEpisodeName(ep.name); // Lưu lại tên tập đang chọn
+                          setActiveEpisodeName(ep.name);
                         } else {
                           alert("Tập này không có link stream!");
                         }
