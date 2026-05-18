@@ -71,16 +71,27 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
-    if (!container) return;
-
-    if (!document.fullscreenElement) {
-      if (container.requestFullscreen) {
+    const video = videoRef.current;
+    if (!container || !video) return;
+  
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      // TRƯỜNG HỢP 1: Chữa cháy riêng cho iPhone/Safari (iOS không cho div full màn hình)
+      if ((video as any).webkitEnterFullscreen) {
+        (video as any).webkitEnterFullscreen();
+      } 
+      // TRƯỜNG HỢP 2: Android và PC (Phóng to cả hộp bọc để giữ nút Tập kế tiếp)
+      else if (container.requestFullscreen) {
         container.requestFullscreen().catch(() => {});
       } else if ((container as any).webkitRequestFullscreen) {
         (container as any).webkitRequestFullscreen();
       }
     } else {
-      document.exitFullscreen().catch(() => {});
+      // Thoát Fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
     }
   };
 
@@ -267,8 +278,8 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         <div className="flex items-center justify-between w-full">
           {isFullscreen ? (
             <button 
-              onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }} // Chặn nổi bọt để không dính Play/Pause
-              className="text-white/80 hover:text-white flex items-center gap-2 font-medium text-base transition duration-200 cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }}
+              className="hidden md:flex text-white/80 hover:text-white items-center gap-2 font-medium text-base transition duration-200 cursor-pointer"
             >
               ✕ Thoát xem phim
             </button>
@@ -359,8 +370,8 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
               {/* NÚT PHÓNG TO / THU NHỎ HOÀN TOÀN BẰNG SVG */}
               <button 
-                onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }} 
-                className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer"
+                onClick={(e) => toggleFullscreen(e)}
+                className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1"
               >
                 {isFullscreen ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
