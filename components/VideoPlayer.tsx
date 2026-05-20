@@ -65,15 +65,18 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
   };
 
-  // HÀM GIAN LẬN XOAY MÀN HÌNH ĐÈ BẸP TAB SAFARI IPHONE
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
     if (!container) return;
 
+    // BẪY THIẾT BỊ TỐI CAO: Nhận diện chuẩn xác iPhone, iPad dốc toàn lực (kể cả iPad giả danh Mac)
     const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+    const isIPad = /iPad/.test(navigator.userAgent) || 
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // Cú lừa nhận diện chip Apple Silicon của iPad
 
-    if (isIPhone) {
+    // NẾU LÀ THIẾT BỊ DI ĐỘNG CỦA APPLE (IPHONE VÀ IPAD)
+    if (isIPhone || isIPad) {
       if (!isFullscreen) {
         const currentWidth = window.innerWidth;
         const currentHeight = window.innerHeight;
@@ -81,35 +84,48 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         const maxEdge = Math.max(currentWidth, currentHeight);
         const minEdge = Math.min(currentWidth, currentHeight);
 
+        // Ép chặt class bằng Tailwind v4 để đè Sandbox PWA
+        container.classList.add("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "fixed";
         container.style.zIndex = "999999";
         container.style.backgroundColor = "#000000";
 
-        // KIỂM TRA HƯỚNG MÁY THỰC TẾ KHI BẤM NÚT PHÓNG TO
+        // Kiểm tra hướng cầm máy thực tế
         const isCurrentlyPortrait = currentHeight > currentWidth;
 
-        if (isCurrentlyPortrait) {
-          container.style.top = "53%"; 
-          container.style.left = "50%";
-          container.style.width = `${maxEdge}px`;  
-          container.style.height = `${minEdge}px`; 
-          container.style.transform = "translate(-50%, -50%) rotate(90deg)";
-        } else {
+        // RIÊNG ĐỐI VỚI IPAD: Không cần xoay 90 độ vì iPad màn hình to, lật ngang dọc đều xem phẳng được
+        if (isIPad) {
           container.style.top = "0";
           container.style.left = "0";
           container.style.width = "100vw";
           container.style.height = "100vh";
           container.style.transform = "none";
+        } else {
+          // ĐỐI VỚI IPHONE: Ép xoay ma trận 90 độ nếu máy đang ở màn hình dọc
+          if (isCurrentlyPortrait) {
+            container.style.top = "50%";
+            container.style.left = "50%";
+            container.style.width = `${maxEdge}px`;  
+            container.style.height = `${minEdge}px`; 
+            container.style.transform = "translate(-50%, -50%) rotate(90deg)";
+          } else {
+            container.style.top = "0";
+            container.style.left = "0";
+            container.style.width = "100vw";
+            container.style.height = "100vh";
+            container.style.transform = "none";
+          }
         }
         
-        window.scrollTo(0, 1);
+        try { window.scrollTo(0, 1); } catch (err) {}
         document.body.style.overflow = "hidden";
         container.style.touchAction = "none";
         
         setIsFullscreen(true);
         if (onFullscreenChange) onFullscreenChange(true);
       } else {
-        // THOÁT PHÓNG TO: Dọn sạch sành sanh inline style trả về trạng thái ban đầu
+        // THOÁT PHÓNG TO: Dọn rác
+        container.classList.remove("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "";
         container.style.top = "";
         container.style.left = "";
@@ -125,6 +141,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         if (onFullscreenChange) onFullscreenChange(false);
       }
     } else {
+      // LUỒNG PC / ANDROID TV THỰC TẾ
       if (!document.fullscreenElement) {
         if (container.requestFullscreen) {
           container.requestFullscreen().catch(() => {});
@@ -154,7 +171,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       const offsetY = clientY - rect.top;
       percentage = Math.max(0, Math.min(1, offsetY / rect.height));
     } else {
-      // Máy nằm ngang sẵn hoặc PC quẹt ngang là tua ngang chuẩn chỉ
       const offsetX = clientX - rect.left;
       percentage = Math.max(0, Math.min(1, offsetX / rect.width));
     }
@@ -168,7 +184,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     const handleFullscreenChange = () => {
       const isFull = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
       setIsFullscreen(isFull);
-      if (onFullscreenChange) onFullscreenChange(isFull); // THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ CHO PC
+      if (onFullscreenChange) onFullscreenChange(isFull);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -176,7 +192,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
     };
-  }, []);
+  }, [onFullscreenChange]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -205,18 +221,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPlaying]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement || !!(document as any).webkitFullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-    };
-  }, []);
 
   const formatTime = (timeInSeconds: number) => {
     if (isNaN(timeInSeconds)) return "00:00";
@@ -303,6 +307,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
           objectFit: "contain"
         }}
+        className="w-full h-full relative z-10"
         onLoadedData={() => setLoading(false)}
         onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
         onError={() => setLoading(false)}
@@ -331,15 +336,29 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         }}
       />
 
+      {/* TÁCH BIỆT HOÀN TOÀN LỚP BẪY CLICK PLAY/PAUSE NỀN */}
       <div 
-        onClick={togglePlay} 
-        className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-black/40 z-30 flex flex-col justify-between p-6 transition-opacity duration-300 ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0 pointer-events-none"} cursor-pointer`}
+        onClick={togglePlay}
+        className={`absolute inset-0 bg-black/10 z-20 transition-opacity duration-300 ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"} cursor-pointer`}
+      />
+
+      {/* BỘ CONTROLS PANEL: TUYỆT ĐỐI KHÔNG DÍNH CLICK PLAY/PAUSE NỀN, ÉP TẦNG ĐỒ HỌA 3D RIÊNG BIỆT CHO IPAD */}
+      <div 
+        onClick={(e) => e.stopPropagation()} 
+        style={{
+          transformStyle: "preserve-3d",
+          transform: "translateZ(999px)"
+        }}
+        className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-black/40 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0 pointer-events-none"} cursor-default`}
       >
-        <div className="flex items-center justify-between w-full">
+        <div className="flex items-center justify-between w-full relative z-50 pointer-events-none">
           {isFullscreen ? (
             <button 
-              onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }}
-              className="hidden md:flex text-white/80 hover:text-white items-center gap-2 font-medium text-base transition duration-200 cursor-pointer"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                toggleFullscreen(e); 
+              }}
+              className="hidden pointer-fine:flex text-white/80 hover:text-white items-center gap-2 font-medium text-base transition duration-200 cursor-pointer pointer-events-auto"
             >
               ✕ Thoát xem phim
             </button>
@@ -347,7 +366,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           <div />
         </div>
 
-        <div onClick={(e) => e.stopPropagation()} className="w-full space-y-4 cursor-default">
+        <div className="w-full space-y-4 relative z-50 pointer-events-auto">
           <div className="flex items-center gap-3 w-full group/timeline">
             <span className="text-zinc-400 text-xs font-medium tabular-nums min-w-[40px]">
               {formatTime(currentTime)}
@@ -441,7 +460,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       </div>
 
       {showNextButton && onNext && (
-        <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300">
+        <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
           <button
             onClick={(e) => { e.stopPropagation(); onNext(); }}
             className="group flex items-center gap-3 bg-zinc-900/95 hover:bg-zinc-800 border border-zinc-700 px-5 py-2.5 rounded shadow-2xl transition-all active:scale-95 cursor-pointer"
