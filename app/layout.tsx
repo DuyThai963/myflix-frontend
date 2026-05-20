@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import ZoomBlocker from "@/components/ZoomBlocker"; // IMPORT THẰNG NÀY VÀO
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -8,10 +9,21 @@ const geistSans = Geist({
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
+// Cấu hình Viewport giữ nguyên chuẩn chỉnh
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,   
+  viewportFit: "cover",  
+};
+
+// Cấu hình Metadata giữ nguyên mượt mà
 export const metadata: Metadata = {
   title: "DT MyFlix",
   description: "Personal Streaming App by Duy Thái",
@@ -23,13 +35,6 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = {
-  themeColor: "#000000",
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,14 +42,17 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
         <meta name="theme-color" content="#000000" />
       </head>
-      <body className="min-h-full flex flex-col bg-black">{children}</body>
+      <body className="min-h-full flex flex-col bg-black text-white selection:bg-red-600 selection:text-white">
+        <ZoomBlocker /> 
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,4 +1,7 @@
+"use client";
+
 import { Movie } from "@/types/movie";
+import { useEffect, useRef } from "react";
 
 type Props = {
   movie: Movie;
@@ -7,8 +10,36 @@ type Props = {
 };
 
 export default function MovieCard({ movie, onClick, onRemove }: Props) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const cardElement = cardRef.current;
+    if (!cardElement) return;
+
+    let lastTouchTime = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const now = window.performance.now();
+      
+      // BẪY SAFARI: Nếu phát hiện 2 cú chạm liên tiếp cách nhau dưới 250ms (Double Tap)
+      if (now - lastTouchTime < 250) {
+        if (e.cancelable) e.preventDefault(); // Chặn đứng và giết chết lệnh tự động zoom của iOS
+      }
+      // Nếu là vuốt cuộn bình thường (chỉ chạm 1 lần rồi di chuyển ngón tay), e.preventDefault() KHÔNG chạy, giúp cuộn mượt
+      lastTouchTime = now;
+    };
+
+    // Buộc phải dùng addEventListener Native với passive: false để đè quyền hệ thống Safari
+    cardElement.addEventListener("touchstart", handleTouchStart, { passive: false });
+
+    return () => {
+      cardElement.removeEventListener("touchstart", handleTouchStart);
+    };
+  }, []);
+
   return (
     <div
+      ref={cardRef} // Gắn ref để kích hoạt bộ bẫy chống zoom Native
       onClick={onClick}
       className="
         relative
@@ -16,23 +47,32 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         aspect-[2/3] 
         rounded-md
         overflow-hidden
-        transition-all
+        transition-transform
         duration-300
-        /* Chỉ phóng to khi dùng chuột trên máy tính */
-        @media(pointer:fine){hover:scale-105 hover:z-50 hover:shadow-2xl}
         cursor-pointer
         bg-zinc-900
         group
+        
+        /* CHUẨN TAILWIND HOVER: Chỉ tương tác khi dùng chuột ở PC/Máy chiếu */
+        @media:pointer-fine:hover:scale-105 
+        @media:pointer-fine:hover:z-50 
+        @media:pointer-fine:hover:shadow-2xl
+
+        /* CHÌA KHÓA: Cho phép vuốt ngang list phim thoải mái, nhưng không cho phép zoom */
+        touch-pan-x touch-pan-y
+        select-none
       "
+      style={{ touchAction: "pan-x pan-y" }} // Đồng bộ inline style để Safari không hiểu lầm
     >
       {/* Poster phim */}
       <img
         src={movie.poster}
         alt={movie.title}
-        className="w-full h-full object-cover object-top"
+        className="w-full h-full object-cover object-top pointer-events-none select-none unselectable"
+        draggable="false"
       />
 
-      {/* Nút xóa - Class remove-btn để CSS điều khiển opacity */}
+      {/* Nút xóa - Giữ nguyên vẹn */}
       {onRemove && (
         <button
           onClick={(e) => {
@@ -50,7 +90,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         </button>
       )}
 
-      {/* Overlay thông tin - Class info-overlay để CSS điều khiển opacity */}
+      {/* Overlay thông tin - Giữ nguyên vẹn */}
       <div
         className="
           info-overlay

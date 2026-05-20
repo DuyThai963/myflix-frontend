@@ -30,7 +30,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Tự động ẩn controls sau 3 giây không di chuột
   const handleUserInteraction = () => {
     setShowControls(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -39,7 +38,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }, 3000);
   };
 
-  // Toggle Play/Pause
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
@@ -51,7 +49,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }
   };
 
-  // Toggle Mute loa
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
@@ -60,50 +57,97 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     setIsMuted(nextMute);
   };
 
-  // Tua phim 10s
   const skipTime = (e: React.MouseEvent, amount: number) => {
     e.stopPropagation();
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
   };
 
-  // Toggle Fullscreen
+  // NÚT PHÓNG TO XOAY NGANG TUYỆT ĐỐI CHO IPHONE
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
-    const video = videoRef.current;
-    if (!container || !video) return;
-  
-    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
-      // TRƯỜNG HỢP 1: Chữa cháy riêng cho iPhone/Safari (iOS không cho div full màn hình)
-      if ((video as any).webkitEnterFullscreen) {
-        (video as any).webkitEnterFullscreen();
-      } 
-      // TRƯỜNG HỢP 2: Android và PC (Phóng to cả hộp bọc để giữ nút Tập kế tiếp)
-      else if (container.requestFullscreen) {
-        container.requestFullscreen().catch(() => {});
-      } else if ((container as any).webkitRequestFullscreen) {
-        (container as any).webkitRequestFullscreen();
+    if (!container) return;
+
+    const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+
+    if (isIPhone) {
+      if (!isFullscreen) {
+        // CƯỜNG CHẾ XOAY NGANG VÀ FILL ĐẦY 100%: 
+        // Lấy chiều rộng bằng chiều cao màn hình thực tế (h-screen) và ngược lại để ép thành hình chữ nhật nằm ngang
+        container.style.position = "fixed";
+        container.style.top = "50%";
+        container.style.left = "50%";
+        container.style.width = "100vh"; 
+        container.style.height = "100vw"; 
+        container.style.transform = "translate(-50%, -50%) rotate(90deg)"; // Xoay ngang góc 90 độ từ tâm
+        container.style.zIndex = "999999";
+        container.style.backgroundColor = "#000000";
+        
+        // Khóa cuộn trang web bên dưới để không bị trượt lung tung khi vuốt tua phim
+        document.body.style.overflow = "hidden";
+        window.scrollTo(0, 0);
+        setIsFullscreen(true);
+      } else {
+        // THOÁT XOAY NGANG TRẢ VỀ BAN ĐẦU
+        container.style.position = "";
+        container.style.top = "";
+        container.style.left = "";
+        container.style.width = "";
+        container.style.height = "";
+        container.style.transform = "";
+        container.style.zIndex = "";
+        container.style.backgroundColor = "";
+        document.body.style.overflow = "";
+        setIsFullscreen(false);
       }
     } else {
-      // Thoát Fullscreen
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
+      // ANDROID VÀ PC GIỮ NGUYÊN API GỐC
+      if (!document.fullscreenElement) {
+        if (container.requestFullscreen) {
+          container.requestFullscreen().catch(() => {});
+        } else if ((container as any).webkitRequestFullscreen) {
+          (container as any).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
       }
     }
   };
 
+  // ĐỒNG BỘ TRỤC TOẠ ĐỘ KHI XOAY NGANG ĐỂ VUỐT KÉO TUA CHUẨN XÁC
+  const handleTimelineUpdate = (clientX: number, clientY: number) => {
+    const timeline = timelineRef.current;
+    const video = videoRef.current;
+    if (!timeline || !video || duration === 0) return;
+
+    const rect = timeline.getBoundingClientRect();
+    const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+    
+    let percentage = 0;
+
+    // LƯU Ý CHÍ MẠNG: Khi iPhone bị xoay 90 độ, Trục X biến thành trục Y.
+    // Do đó phải lấy clientY trừ đi khoảng cách top để tính độ dài thanh quẹt ngón tay
+    if (isIPhone && isFullscreen) {
+      const offsetY = clientY - rect.top;
+      percentage = Math.max(0, Math.min(1, offsetY / rect.height));
+    } else {
+      const offsetX = clientX - rect.left;
+      percentage = Math.max(0, Math.min(1, offsetX / rect.width));
+    }
+    
+    const newTime = percentage * duration;
+    video.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
-        return;
-      }
-  
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
       if (!videoRef.current) return;
   
-      // Chấp nhận cả tên phím chuẩn PC và mã phím điều hướng đặc thù của Android TV / Remote máy chiếu
       const isRight = e.key === "ArrowRight" || e.keyCode === 39;
       const isLeft = e.key === "ArrowLeft" || e.keyCode === 37;
       const isSpace = e.key === " " || e.key === "Spacebar" || e.keyCode === 32;
@@ -124,14 +168,12 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     };
   
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPlaying]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!document.fullscreenElement || !!(document as any).webkitFullscreenElement);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
@@ -146,31 +188,12 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     const hours = Math.floor(timeInSeconds / 3600);
     const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const seconds = Math.floor(timeInSeconds % 60);
-
     const paddedMinutes = String(minutes).padStart(2, "0");
     const paddedSeconds = String(seconds).padStart(2, "0");
-
-    if (hours > 0) {
-      return `${hours}:${paddedMinutes}:${paddedSeconds}`;
-    }
+    if (hours > 0) return `${hours}:${paddedMinutes}:${paddedSeconds}`;
     return `${paddedMinutes}:${paddedSeconds}`;
   };
 
-  const handleTimelineUpdate = (clientX: number) => {
-    const timeline = timelineRef.current;
-    const video = videoRef.current;
-    if (!timeline || !video || duration === 0) return;
-
-    const rect = timeline.getBoundingClientRect();
-    const offsetX = clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, offsetX / rect.width));
-    
-    const newTime = percentage * duration;
-    video.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
-  // Khởi tạo nguồn phát HLS / MP4
   useEffect(() => {
     if (!videoRef.current || !src) return;
     setLoading(true);
@@ -230,24 +253,21 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       )}
 
-      {/* 1. CLICK CHÍNH DIỆN VÀO VIDEO ĐỂ PLAY/PAUSE */}
       <video
         ref={videoRef}
         controls={false} 
         autoPlay
         playsInline={true}
         webkit-playsinline="true"
-        onClick={togglePlay} // Ăn lệnh trực tiếp khi click chuột vào màn hình phim
+        onClick={togglePlay}
         className="w-full h-full object-contain cursor-pointer relative z-10"
         onLoadedData={() => setLoading(false)}
         onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
         onError={() => setLoading(false)}
-        
         onTimeUpdate={(e) => {
           const video = e.target as HTMLVideoElement;
           const current = video.currentTime;
           const dur = video.duration;
-          
           setCurrentTime(current);
           if (onProgress) onProgress(current);
 
@@ -269,12 +289,10 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         }}
       />
 
-      {/* 2. KHUNG PANEL ĐIỀU KHIỂN - CLICK VÀO PHẦN TRỐNG CỦA PANEL CŨNG PHÁT/DỪNG ĐƯỢC PHIM */}
       <div 
-        onClick={togglePlay} // Click vào vùng trống của panel điều khiển (lớp đen mờ) vẫn nhận lệnh Play/Pause
+        onClick={togglePlay} 
         className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-black/40 z-30 flex flex-col justify-between p-6 transition-opacity duration-300 ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0 pointer-events-none"} cursor-pointer`}
       >
-        {/* Top bar */}
         <div className="flex items-center justify-between w-full">
           {isFullscreen ? (
             <button 
@@ -287,12 +305,8 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           <div />
         </div>
 
-        {/* Bottom bar */}
-        <div 
-          onClick={(e) => e.stopPropagation()} // QUAN TRỌNG: Chỉ chặn nổi bọt ở riêng cụm bọc Timeline + Nút để khi bấm nút không bị dừng phim
-          className="w-full space-y-4 cursor-default"
-        >
-          {/* TIMELINE */}
+        <div onClick={(e) => e.stopPropagation()} className="w-full space-y-4 cursor-default">
+          {/* TIMELINE HỖ TRỢ CLICK VÀ VUỐT KÉO ĐÃ ĐỒNG BỘ ĐẢO TRỤC */}
           <div className="flex items-center gap-3 w-full group/timeline">
             <span className="text-zinc-400 text-xs font-medium tabular-nums min-w-[40px]">
               {formatTime(currentTime)}
@@ -300,16 +314,25 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
             
             <div 
               ref={timelineRef}
-              onClick={(e) => handleTimelineUpdate(e.clientX)}
+              onClick={(e) => handleTimelineUpdate(e.clientX, e.clientY)}
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => setIsDragging(false)}
+              
+              onTouchStart={() => setIsDragging(true)}
+              onTouchEnd={() => setIsDragging(false)}
+              onTouchMove={(e) => {
+                if (e.touches.length > 0) {
+                  // Đọc đồng thời cả 2 toạ độ trục ngang dọc để hàm đảo trục xử lý ngón tay lúc xoay ngang
+                  handleTimelineUpdate(e.touches[0].clientX, e.touches[0].clientY);
+                }
+              }}
               className="relative flex-1 h-1.5 bg-zinc-600/60 rounded-full cursor-pointer hover:h-2 transition-all duration-150 flex items-center"
             >
               <div 
                 className="h-full bg-red-600 rounded-full relative flex items-center justify-end"
                 style={{ width: `${progressPercent}%` }}
               >
-                <div className="absolute right-[-6px] w-3.5 h-3.5 bg-red-600 border border-white rounded-full scale-0 group-hover/timeline:scale-100 transition-transform duration-100 shadow-lg" />
+                <div className="absolute right-[-6px] w-4 h-4 bg-red-600 border border-white rounded-full scale-100 shadow-lg" />
               </div>
             </div>
 
@@ -318,10 +341,8 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
             </span>
           </div>
 
-          {/* BỘ NÚT CHỨC NĂNG */}
           <div className="flex items-center justify-between w-full relative">
             <div className="flex items-center gap-6">
-              {/* Play/Pause SVG */}
               <button onClick={togglePlay} className="text-white hover:text-red-500 transition transform active:scale-90 cursor-pointer">
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -334,7 +355,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 )}
               </button>
 
-              {/* Tua lùi 10s */}
               <button onClick={(e) => skipTime(e, -10)} className="text-zinc-300 hover:text-white transition relative flex items-center justify-center w-7 h-7 active:scale-90 cursor-pointer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -343,7 +363,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 <span className="absolute text-[9px] font-extrabold tracking-tighter select-none pt-0.5">10</span>
               </button>
 
-              {/* Tua nhanh 10s */}
               <button onClick={(e) => skipTime(e, 10)} className="text-zinc-300 hover:text-white transition relative flex items-center justify-center w-7 h-7 active:scale-90 cursor-pointer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -352,7 +371,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 <span className="absolute text-[9px] font-extrabold tracking-tighter select-none pt-0.5">10</span>
               </button>
 
-              {/* NÚT LOA BẬT TẮT ÂM THANH */}
               <button onClick={toggleMute} className="text-zinc-300 hover:text-white transition active:scale-90 pl-1 cursor-pointer">
                 {isMuted ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -367,12 +385,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
             </div>
             
             <div className="flex items-center gap-5">
-
-              {/* NÚT PHÓNG TO / THU NHỎ HOÀN TOÀN BẰNG SVG */}
-              <button 
-                onClick={(e) => toggleFullscreen(e)}
-                className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1"
-              >
+              <button onClick={(e) => toggleFullscreen(e)} className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1">
                 {isFullscreen ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                     <path d="M4 14h6v6M20 10h-6V4M14 10l6-6M10 14l-6 6" />
@@ -388,12 +401,11 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       </div>
 
-      {/* NÚT TẬP TIẾP THEO BẤT TỬ */}
       {showNextButton && onNext && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300">
           <button
             onClick={(e) => {
-              e.stopPropagation(); // Chặn hành vi nổi bọt kích hoạt togglePlay khi bấm nhảy tập
+              e.stopPropagation(); 
               onNext();
             }}
             className="group flex items-center gap-3 bg-zinc-900/95 hover:bg-zinc-800 border border-zinc-700 px-5 py-2.5 rounded shadow-2xl transition-all active:scale-95 cursor-pointer"

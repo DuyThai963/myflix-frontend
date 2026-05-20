@@ -1,0 +1,19 @@
+/* LỚP PHỦ TỐI CAO ĐÈ BẸP TOÀN BỘ TRÌNH DUYỆT IPHONE */
+.ios-force-landscape {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vh !important; /* Chiều rộng bằng chiều cao màn hình thực tế */
+  height: 100vw !important; /* Chiều cao bằng chiều rộng màn hình thực tế */
+  background-color: #000000 !important;
+  z-index: 999999 !important;
+  
+  /* Ma trận xoay cưỡng bức góc chuẩn */
+  transform: rotate(90deg) !important;
+  transform-origin: bottom left !important;
+  transform: translate3d(0, -100vh, 0) rotate(90deg) !important;
+  
+  /* Khóa chết tuyệt đối bóng ma cuộn bên dưới */
+  touch-action: none !important;
+  overflow: hidden !important;
+}

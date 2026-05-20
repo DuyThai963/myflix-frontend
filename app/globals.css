@@ -19,6 +19,15 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* VÁ LỖ HỔNG ZOOM KHI BẤM ĐẠI VÀO KHOẢNG TRỐNG */
+/* Ép tất cả các khối chứa, tiêu đề phim, vùng text nhận diện cuộn trượt chứ không cho phép kích hoạt cử chỉ Zoom ngầm của hệ thống */
+main,
+section,
+h1, h2, h3, p,
+.scroll-container {
+  touch-action: pan-x pan-y !important;
+}
+
 /* Ẩn thanh cuộn mặc định */
 ::-webkit-scrollbar {
   display: none;
@@ -48,4 +57,24 @@ body {
   html, body {
     -webkit-overflow-scrolling: touch;
   }
+}
+
+@media (pointer: coarse) {
+  html, body {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* DÁN THÊM VÀO DƯỚI CÙNG NÀY ĐỂ TRIỆT TIÊU NÚT BẤM ẨN */
+video::-webkit-media-controls {
+  display: none !important;
+}
+video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+video::-webkit-media-controls-panel {
+  display: none !important;
+}
+video::-webkit-media-controls-start-playback-button {
+  display: none !important;
 }

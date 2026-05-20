@@ -16,6 +16,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -60,6 +61,21 @@ export default function Navbar({ keyword, setKeyword }: Props) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Nếu ô search đang mở VÀ vị trí click KHÔNG nằm trong cụm search container
+      if (showSearch && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSearch(false);
+      }
+    };
+
+    // Lắng nghe sự kiện click trên toàn bộ tài liệu trang web
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSearch]);
 
   // Hàm chuyển đổi Categories an toàn (Chống nháy trên iPad)
   const toggleDropdown = (e: React.MouseEvent) => {
@@ -148,20 +164,23 @@ export default function Navbar({ keyword, setKeyword }: Props) {
 
         {/* RIGHT SECTION */}
         <div className="flex items-center gap-4 md:gap-6">
-          <div className="flex items-center gap-3">
+          <div ref={searchContainerRef} className="flex items-center gap-3 relative">
             {showSearch && (
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && keyword.trim() !== "" && router.push(`/search?q=${keyword.trim()}`)}
                 placeholder="Search movies..."
-                className="bg-black/60 border border-zinc-700 px-3 py-1 rounded-full outline-none text-xs text-white w-32 md:w-48 focus:border-red-600 transition-all"
+                className="bg-black/60 border border-zinc-700 px-3 py-1 rounded-full outline-none text-xs text-white w-32 md:w-48 focus:border-red-600 transition-all animate-in fade-in slide-in-from-right-3 duration-200"
                 autoFocus
               />
             )}
             <FaSearch 
-              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg" 
-              onClick={() => setShowSearch(!showSearch)} 
+              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg active:scale-90" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSearch(!showSearch);
+              }} 
             />
           </div>
           
