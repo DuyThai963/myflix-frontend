@@ -32,22 +32,45 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 1. Quản lý tự động ẩn thanh điều khiển sau 3 giây
   const handleUserInteraction = () => {
     setShowControls(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      if (isPlaying && !isDragging && !showMoreMenu) setShowControls(false);
-    }, 3000);
+    if (isPlaying && !isDragging && !showMoreMenu) {
+      timeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
   };
 
+  // 2. Logic nút Play/Pause khi bấm trực tiếp trên thanh công cụ
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+      setShowControls(true); // Giữ cố định thanh công cụ khi tạm dừng phim
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     } else {
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
+  };
+
+  // 3. XỬ LÝ CHẠM VÀO KHOẢNG TRỐNG NỀN: Kết hợp cơ chế ẩn/hiện thông minh
+  const handleBackgroundClick = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (showControls) {
+      // Nếu bộ nút đang hiện -> Bấm vùng trống chỉ làm ẩn bộ nút đi, phim vẫn chạy tiếp
+      setShowControls(false);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    } else {
+      // Nếu bộ nút đã ẩn hoàn toàn -> Bấm vùng trống sẽ thực hiện Dừng hoặc Phát tiếp phim
+      togglePlay();
     }
   };
 
@@ -57,20 +80,22 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     const nextMute = !isMuted;
     videoRef.current.muted = nextMute;
     setIsMuted(nextMute);
+    handleUserInteraction();
   };
 
   const skipTime = (e: React.MouseEvent, amount: number) => {
     e.stopPropagation();
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
+    handleUserInteraction();
   };
 
+  // 4. HÀM PHÓNG TO TOÀN MÀN HÌNH: TÁCH BIỆT LOGIC TOÁN HÌNH HỌC IPHONE (BẢN 1) VÀ IPAD (BẢN 2)
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
     if (!container) return;
 
-    // Bẫy thiết bị chính xác tuyệt đối
     const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
     const isIPad = /iPad/.test(navigator.userAgent) || 
                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -83,24 +108,23 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         const maxEdge = Math.max(currentWidth, currentHeight);
         const minEdge = Math.min(currentWidth, currentHeight);
 
-        // Ép chặt lớp phủ nền đen toàn diện bằng cả class lẫn style
         container.classList.add("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "fixed";
         container.style.zIndex = "999999";
         container.style.backgroundColor = "#000000";
 
         if (isIPad) {
-          // LUỒNG IPAD: Không cần lật ma trận 90 độ, bung phẳng tự nhiên theo khung máy
+          // LUỒNG IPAD CHUẨN (BẢN 2): Bung phẳng tự nhiên toàn màn hình, không lật xoay xoắn não
           container.style.top = "0";
           container.style.left = "0";
           container.style.width = "100vw";
           container.style.height = "100vh";
           container.style.transform = "none";
         } else {
-          // LUỒNG IPHONE: KHÔI PHỤC LẠI MA TRẬN XOAY LỲ ĐÒN BAN ĐẦU
+          // LUỒNG IPHONE CHUẨN (BẢN 1): GIỮ NGUYÊN 100% TOÁN HÌNH HỌC LUỒNG CŨ CHỐNG LỆCH GÓC TRÊN TRÁI
           const isCurrentlyPortrait = currentHeight > currentWidth;
           if (isCurrentlyPortrait) {
-            container.style.top = "50%";
+            container.style.top = "53%"; 
             container.style.left = "50%";
             container.style.width = `${maxEdge}px`;  
             container.style.height = `${minEdge}px`; 
@@ -119,8 +143,9 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         container.style.touchAction = "none";
         
         setIsFullscreen(true);
+        if (onFullscreenChange) onFullscreenChange(true);
       } else {
-        // THOÁT PHÓNG TO: Dọn sạch sành sanh rác đồ họa trả về ban đầu
+        // THOÁT PHÓNG TO: Dọn sạch rác đồ họa cho cả 2 luồng thiết bị Apple
         container.classList.remove("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "";
         container.style.top = "";
@@ -134,48 +159,26 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         document.body.style.overflow = "";
         
         setIsFullscreen(false);
+        if (onFullscreenChange) onFullscreenChange(false);
       }
     } else {
-      // LUỒNG PC / TV GIỮ NGUYÊN GỐC KHÔNG THAY ĐỔI
+      // LUỒNG FULLSCREEN GỐC DÀNH CHO PC / TV CHUẨN CHỈ
       if (!document.fullscreenElement) {
-        container.requestFullscreen()
-          .then(() => setIsFullscreen(true))
-          .catch(() => {});
+        if (container.requestFullscreen) {
+          container.requestFullscreen().catch(() => {});
+        } else if ((container as any).webkitRequestFullscreen) {
+          (container as any).webkitRequestFullscreen();
+        }
       } else {
-        document.exitFullscreen()
-          .then(() => setIsFullscreen(false))
-          .catch(() => {});
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
       }
     }
     handleUserInteraction();
   };
 
-  // ĐỒNG BỘ TRỤC CẢM ỨNG TIMELINE KHI IPHONE XOAY MA TRẬN 90 ĐỘ
-  const handleTimelineUpdate = (clientX: number, clientY: number) => {
-    if (!timelineRef.current || !videoRef.current || duration === 0) return;
-    
-    const rect = timelineRef.current.getBoundingClientRect();
-    const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
-    const isIPhonePortraitFull = isIPhone && isFullscreen && (window.innerHeight > window.innerWidth);
-    
-    let percentage = 0;
-
-    if (isIPhonePortraitFull) {
-      // Khi iPhone xoay 90 độ, trục ngang biến thành dọc -> dùng tọa độ dọc clientY để tua
-      const offsetY = clientY - rect.top;
-      percentage = Math.max(0, Math.min(1, offsetY / rect.height));
-    } else {
-      // iPad, PC hoặc iPhone đã nằm ngang sẵn -> dùng tọa độ ngang clientX chuẩn chỉ
-      const offsetX = clientX - rect.left;
-      percentage = Math.max(0, Math.min(1, offsetX / rect.width));
-    }
-    
-    const newTime = percentage * duration;
-    videoRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-    handleUserInteraction();
-  };
-
+  // 5. ĐỒNG BỘ TRỤC CẢM ỨNG ĐỂ TUA SẮC NÉT TRÊN CẢ IPHONE XOAY 90 ĐỘ VÀ IPAD/PC PHẲNG
   const handleTimelineUpdate = (clientX: number, clientY: number) => {
     const timeline = timelineRef.current;
     const video = videoRef.current;
@@ -188,9 +191,11 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     let percentage = 0;
 
     if (isIPhonePortraitFull) {
+      // iPhone lật đứng máy: đảo tọa độ dọc để kéo timeline ngang
       const offsetY = clientY - rect.top;
       percentage = Math.max(0, Math.min(1, offsetY / rect.height));
     } else {
+      // iPad, PC, hoặc điện thoại đã nằm ngang sẵn: quẹt ngang chuẩn chỉ
       const offsetX = clientX - rect.left;
       percentage = Math.max(0, Math.min(1, offsetX / rect.width));
     }
@@ -198,6 +203,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     const newTime = percentage * duration;
     video.currentTime = newTime;
     setCurrentTime(newTime);
+    handleUserInteraction();
   };
 
   useEffect(() => {
@@ -297,16 +303,26 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }
   }, [src, movieId]);
 
+  // Đồng bộ dọn dẹp và kiểm soát trạng thái tương tác mỗi khi thay đổi trạng thái phát phim
+  useEffect(() => {
+    if (isPlaying) {
+      handleUserInteraction();
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [isPlaying]);
+
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div 
       ref={playerContainerRef}
       onMouseMove={handleUserInteraction}
-      onMouseLeave={() => !isDragging && setShowControls(false)}
+      onMouseLeave={() => !isDragging && isPlaying && setShowControls(false)}
       onTouchEnd={() => {
         setIsDragging(false);
-        handleUserInteraction();
+        if (isPlaying) handleUserInteraction();
       }}
       className="relative w-full h-full bg-black overflow-hidden group flex items-center justify-center select-none font-sans cursor-default"
     >
@@ -316,18 +332,24 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       )}
 
+      {/* LỚP VIDEO NỀN (z-10): Chịu trách nhiệm bẫy chạm Play/Pause full diện tích màn hình */}
       <video
         ref={videoRef}
         controls={false} 
         autoPlay
         playsInline={true}
         webkit-playsinline="true"
-        onClick={togglePlay}
+        onClick={handleBackgroundClick}
+        onTouchEnd={(e) => {
+          if (!isDragging) {
+            handleBackgroundClick(e);
+          }
+        }}
         style={{
           aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
           objectFit: "contain"
         }}
-        className="w-full h-full relative z-10"
+        className="w-full h-full relative z-10 transition-all duration-150 ease-out"
         onLoadedData={() => setLoading(false)}
         onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
         onError={() => setLoading(false)}
@@ -340,9 +362,9 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
           if (isSeries && dur > 0) {
             const timeLeft = dur - current;
-            let skipTime = 150;
+            let skipTime = 90;
             if (dur > 3000) skipTime = 210;
-            else if (dur > 1800) skipTime = 180;
+            else if (dur > 1800) skipTime = 150;
 
             if (timeLeft <= skipTime && timeLeft > 2) {
               setShowNextButton(true);
@@ -356,28 +378,23 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         }}
       />
 
-      {/* TÁCH BIỆT HOÀN TOÀN LỚP BẪY CLICK PLAY/PAUSE NỀN */}
-      <div 
-        onClick={togglePlay}
-        className={`absolute inset-0 bg-black/10 z-20 transition-opacity duration-300 ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"} cursor-pointer`}
-      />
-
-      {/* BỘ CONTROLS PANEL: TUYỆT ĐỐI KHÔNG DÍNH CLICK PLAY/PAUSE NỀN, ÉP TẦNG ĐỒ HỌA 3D RIÊNG BIỆT CHO IPAD */}
+      {/* BỘ CONTROLS PANEL (z-40): Ép tầng đồ họa ma trận 3D độc lập chống lỗi dính nút/nuốt nút trên iPad */}
       <div 
         onClick={(e) => e.stopPropagation()} 
+        onTouchEnd={(e) => e.stopPropagation()} 
         style={{
           transformStyle: "preserve-3d",
-          transform: "translateZ(999px)"
+          transform: "translateZ(999px)",
         }}
-        className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-black/40 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0 pointer-events-none"} cursor-default`}
+        // 'pointer-events-none' cho phép cú click xuyên thẳng qua bảng điều khiển chạm trúng video nền
+        className={`absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 pointer-events-none ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0"}`}
       >
-        <div className="flex items-center justify-between w-full relative z-50 pointer-events-none">
+        {/* Top bar (Nút thoát Fullscreen chỉ xuất hiện độc quyền khi xem trên PC chuột) */}
+        <div className="flex items-center justify-between w-full relative z-50">
           {isFullscreen ? (
             <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                toggleFullscreen(e); 
-              }}
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }}
+              onTouchEnd={(e) => { e.stopPropagation(); toggleFullscreen(e); }}
               className="hidden pointer-fine:flex text-white/80 hover:text-white items-center gap-2 font-medium text-base transition duration-200 cursor-pointer pointer-events-auto"
             >
               ✕ Thoát xem phim
@@ -386,7 +403,13 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           <div />
         </div>
 
-        <div className="w-full space-y-4 relative z-50 pointer-events-auto">
+        {/* Bottom bar (Ép cứng pointer-events-auto để tương tác mượt mà thanh timeline và bộ nút) */}
+        <div 
+          onClick={(e) => e.stopPropagation()} 
+          onTouchEnd={(e) => e.stopPropagation()} 
+          className="w-full space-y-4 pointer-events-auto cursor-default relative z-50"
+        >
+          {/* THANH TIMELINE TUA PHIM */}
           <div className="flex items-center gap-3 w-full group/timeline">
             <span className="text-zinc-400 text-xs font-medium tabular-nums min-w-[40px]">
               {formatTime(currentTime)}
@@ -419,8 +442,10 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
             </span>
           </div>
 
+          {/* BỘ NÚT CHỨC NĂNG CHUẨN ĐỒ HỌA SẮC NÉT */}
           <div className="flex items-center justify-between w-full relative">
             <div className="flex items-center gap-6">
+              {/* Nút Play / Pause */}
               <button onClick={togglePlay} className="text-white hover:text-red-500 transition transform active:scale-90 cursor-pointer">
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -433,6 +458,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 )}
               </button>
 
+              {/* Nút Tua Lùi 10 Giây */}
               <button onClick={(e) => skipTime(e, -10)} className="text-zinc-300 hover:text-white transition relative flex items-center justify-center w-7 h-7 active:scale-90 cursor-pointer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -441,6 +467,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 <span className="absolute text-[9px] font-extrabold tracking-tighter select-none pt-0.5">10</span>
               </button>
 
+              {/* Nút Tua Nhanh 10 Giây */}
               <button onClick={(e) => skipTime(e, 10)} className="text-zinc-300 hover:text-white transition relative flex items-center justify-center w-7 h-7 active:scale-90 cursor-pointer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
                   <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -449,6 +476,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
                 <span className="absolute text-[9px] font-extrabold tracking-tighter select-none pt-0.5">10</span>
               </button>
 
+              {/* Nút Loa / Mute */}
               <button onClick={toggleMute} className="text-zinc-300 hover:text-white transition active:scale-90 pl-1 cursor-pointer">
                 {isMuted ? (
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -462,8 +490,9 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
               </button>
             </div>
             
-            <div className="flex items-center gap-5">
-              <button onClick={(e) => toggleFullscreen(e)} className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1">
+            {/* Nút Phóng to / Thu nhỏ đồng bộ đúng theo biến isFullscreen */}
+            <div className="flex items-center gap-5 relative z-50">
+              <button onClick={(e) => toggleFullscreen(e)} className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1 pointer-events-auto">
                 {isFullscreen ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
                     <path d="M4 14h6v6M20 10h-6V4M14 10l6-6M10 14l-6 6" />
@@ -479,6 +508,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       </div>
 
+      {/* NÚT TẬP TIẾP THEO TỰ ĐỘNG XUẤT HIỆN GẦN CUỐI PHIM */}
       {showNextButton && onNext && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
           <button
