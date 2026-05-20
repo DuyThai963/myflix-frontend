@@ -24,7 +24,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showNextButton, setShowNextButton] = useState(false);
-  const [showSkipIntroButton, setShowSkipIntroButton] = useState(false); // CHÈN THÊM: State nút Skip Intro
+  const [showSkipIntroButton, setShowSkipIntroButton] = useState(false); // Thêm state quản lý nút Skip Intro
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   
   const [currentTime, setCurrentTime] = useState(0);
@@ -33,7 +33,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Quản lý tự động ẩn thanh điều khiển sau 3 giây
   const handleUserInteraction = () => {
     setShowControls(true);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -44,13 +43,11 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }
   };
 
-  // 2. Logic nút Play/Pause khi bấm trực tiếp trên thanh công cụ
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
-      setShowControls(true); // Giữ cố định thanh công cụ khi tạm dừng phim
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     } else {
       videoRef.current.play().catch(() => {});
@@ -59,19 +56,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       timeoutRef.current = setTimeout(() => {
         setShowControls(false);
       }, 3000);
-    }
-  };
-
-  // 3. XỬ LÝ CHẠM VÀO KHOẢNG TRỐNG NỀN: Kết hợp cơ chế ẩn/hiện thông minh
-  const handleBackgroundClick = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    if (showControls) {
-      // Nếu bộ nút đang hiện -> Bấm vùng trống chỉ làm ẩn bộ nút đi, phim vẫn chạy tiếp
-      setShowControls(false);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    } else {
-      // Nếu bộ nút đã ẩn hoàn toàn -> Bấm vùng trống sẽ thực hiện Dừng hoặc Phát tiếp phim
-      togglePlay();
     }
   };
 
@@ -91,7 +75,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     handleUserInteraction();
   };
 
-  // CHÈN THÊM: Hàm xử lý nhảy nhanh qua đoạn giới thiệu đầu phim (90 giây)
   const handleSkipIntro = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
@@ -101,7 +84,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     handleUserInteraction();
   };
 
-  // 4. HÀM PHÓNG TO TOÀN MÀN HÌNH: TÁCH BIỆT LOGIC TOÁN HÌNH HỌC IPHONE (BẢN 1) VÀ IPAD (BẢN 2)
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
@@ -119,7 +101,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         const maxEdge = Math.max(currentWidth, currentHeight);
         const minEdge = Math.min(currentWidth, currentHeight);
 
-        container.classList.add("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "fixed";
         container.style.zIndex = "999999";
         container.style.backgroundColor = "#000000";
@@ -173,7 +154,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         if (onFullscreenChange) onFullscreenChange(false);
       }
     } else {
-      // LUỒNG FULLSCREEN GỐC DÀNH CHO PC / TV CHUẨN CHỈ
       if (!document.fullscreenElement) {
         if (container.requestFullscreen) {
           container.requestFullscreen().catch(() => {});
@@ -189,7 +169,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     handleUserInteraction();
   };
 
-  // 5. ĐỒNG BỘ TRỤC CẢM ỨNG ĐỂ TUA SẮC NÉT TRÊN CẢ IPHONE XOAY 90 ĐỘ VÀ IPAD/PC PHẲNG
   const handleTimelineUpdate = (clientX: number, clientY: number) => {
     const timeline = timelineRef.current;
     const video = videoRef.current;
@@ -274,7 +253,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     if (!videoRef.current || !src) return;
     setLoading(true);
     setShowNextButton(false);
-    setShowSkipIntroButton(false); // Đảm bảo reset trạng thái khi đổi tập phim
+    setShowSkipIntroButton(false);
     setIsPlaying(true);
     setShowMoreMenu(false);
     setCurrentTime(0);
@@ -344,24 +323,17 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       )}
 
-      {/* LỚP VIDEO NỀN (z-10): Chịu trách nhiệm bẫy chạm Play/Pause full diện tích màn hình */}
       <video
         ref={videoRef}
         controls={false} 
         autoPlay
         playsInline={true}
         webkit-playsinline="true"
-        onClick={handleBackgroundClick}
-        onTouchEnd={(e) => {
-          if (!isDragging) {
-            handleBackgroundClick(e);
-          }
-        }}
+        onClick={togglePlay}
         style={{
           aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
           objectFit: "contain"
         }}
-        className="w-full h-full relative z-10 transition-all duration-150 ease-out"
         onLoadedData={() => setLoading(false)}
         onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
         onError={() => setLoading(false)}
