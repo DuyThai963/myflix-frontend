@@ -70,12 +70,11 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     const container = playerContainerRef.current;
     if (!container) return;
 
-    // BẪY THIẾT BỊ TỐI CAO: Nhận diện chuẩn xác iPhone, iPad dốc toàn lực (kể cả iPad giả danh Mac)
+    // Bẫy thiết bị chính xác tuyệt đối
     const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
     const isIPad = /iPad/.test(navigator.userAgent) || 
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // Cú lừa nhận diện chip Apple Silicon của iPad
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    // NẾU LÀ THIẾT BỊ DI ĐỘNG CỦA APPLE (IPHONE VÀ IPAD)
     if (isIPhone || isIPad) {
       if (!isFullscreen) {
         const currentWidth = window.innerWidth;
@@ -84,24 +83,22 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         const maxEdge = Math.max(currentWidth, currentHeight);
         const minEdge = Math.min(currentWidth, currentHeight);
 
-        // Ép chặt class bằng Tailwind v4 để đè Sandbox PWA
+        // Ép chặt lớp phủ nền đen toàn diện bằng cả class lẫn style
         container.classList.add("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "fixed";
         container.style.zIndex = "999999";
         container.style.backgroundColor = "#000000";
 
-        // Kiểm tra hướng cầm máy thực tế
-        const isCurrentlyPortrait = currentHeight > currentWidth;
-
-        // RIÊNG ĐỐI VỚI IPAD: Không cần xoay 90 độ vì iPad màn hình to, lật ngang dọc đều xem phẳng được
         if (isIPad) {
+          // LUỒNG IPAD: Không cần lật ma trận 90 độ, bung phẳng tự nhiên theo khung máy
           container.style.top = "0";
           container.style.left = "0";
           container.style.width = "100vw";
           container.style.height = "100vh";
           container.style.transform = "none";
         } else {
-          // ĐỐI VỚI IPHONE: Ép xoay ma trận 90 độ nếu máy đang ở màn hình dọc
+          // LUỒNG IPHONE: KHÔI PHỤC LẠI MA TRẬN XOAY LỲ ĐÒN BAN ĐẦU
+          const isCurrentlyPortrait = currentHeight > currentWidth;
           if (isCurrentlyPortrait) {
             container.style.top = "50%";
             container.style.left = "50%";
@@ -122,9 +119,8 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         container.style.touchAction = "none";
         
         setIsFullscreen(true);
-        if (onFullscreenChange) onFullscreenChange(true);
       } else {
-        // THOÁT PHÓNG TO: Dọn rác
+        // THOÁT PHÓNG TO: Dọn sạch sành sanh rác đồ họa trả về ban đầu
         container.classList.remove("!fixed", "!inset-0", "!z-[999999]", "!bg-black");
         container.style.position = "";
         container.style.top = "";
@@ -138,22 +134,46 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         document.body.style.overflow = "";
         
         setIsFullscreen(false);
-        if (onFullscreenChange) onFullscreenChange(false);
       }
     } else {
-      // LUỒNG PC / ANDROID TV THỰC TẾ
+      // LUỒNG PC / TV GIỮ NGUYÊN GỐC KHÔNG THAY ĐỔI
       if (!document.fullscreenElement) {
-        if (container.requestFullscreen) {
-          container.requestFullscreen().catch(() => {});
-        } else if ((container as any).webkitRequestFullscreen) {
-          (container as any).webkitRequestFullscreen();
-        }
+        container.requestFullscreen()
+          .then(() => setIsFullscreen(true))
+          .catch(() => {});
       } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-        }
+        document.exitFullscreen()
+          .then(() => setIsFullscreen(false))
+          .catch(() => {});
       }
     }
+    handleUserInteraction();
+  };
+
+  // ĐỒNG BỘ TRỤC CẢM ỨNG TIMELINE KHI IPHONE XOAY MA TRẬN 90 ĐỘ
+  const handleTimelineUpdate = (clientX: number, clientY: number) => {
+    if (!timelineRef.current || !videoRef.current || duration === 0) return;
+    
+    const rect = timelineRef.current.getBoundingClientRect();
+    const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+    const isIPhonePortraitFull = isIPhone && isFullscreen && (window.innerHeight > window.innerWidth);
+    
+    let percentage = 0;
+
+    if (isIPhonePortraitFull) {
+      // Khi iPhone xoay 90 độ, trục ngang biến thành dọc -> dùng tọa độ dọc clientY để tua
+      const offsetY = clientY - rect.top;
+      percentage = Math.max(0, Math.min(1, offsetY / rect.height));
+    } else {
+      // iPad, PC hoặc iPhone đã nằm ngang sẵn -> dùng tọa độ ngang clientX chuẩn chỉ
+      const offsetX = clientX - rect.left;
+      percentage = Math.max(0, Math.min(1, offsetX / rect.width));
+    }
+    
+    const newTime = percentage * duration;
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+    handleUserInteraction();
   };
 
   const handleTimelineUpdate = (clientX: number, clientY: number) => {
