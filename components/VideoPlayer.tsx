@@ -24,6 +24,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showNextButton, setShowNextButton] = useState(false);
+  const [showSkipIntroButton, setShowSkipIntroButton] = useState(false); // CHÈN THÊM: State nút Skip Intro
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   
   const [currentTime, setCurrentTime] = useState(0);
@@ -87,6 +88,16 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     e.stopPropagation();
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
+    handleUserInteraction();
+  };
+
+  // CHÈN THÊM: Hàm xử lý nhảy nhanh qua đoạn giới thiệu đầu phim (90 giây)
+  const handleSkipIntro = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = 90;
+    setCurrentTime(90);
+    setShowSkipIntroButton(false);
     handleUserInteraction();
   };
 
@@ -263,6 +274,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     if (!videoRef.current || !src) return;
     setLoading(true);
     setShowNextButton(false);
+    setShowSkipIntroButton(false); // Đảm bảo reset trạng thái khi đổi tập phim
     setIsPlaying(true);
     setShowMoreMenu(false);
     setCurrentTime(0);
@@ -359,12 +371,17 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           const dur = video.duration;
           setCurrentTime(current);
           if (onProgress) onProgress(current);
+          if (current >= 3 && current < 45) {
+            setShowSkipIntroButton(true);
+          } else {
+            setShowSkipIntroButton(false);
+          }
 
           if (isSeries && dur > 0) {
             const timeLeft = dur - current;
-            let skipTime = 90;
+            let skipTime = 135;
             if (dur > 3000) skipTime = 210;
-            else if (dur > 1800) skipTime = 150;
+            else if (dur > 1800) skipTime = 165;
 
             if (timeLeft <= skipTime && timeLeft > 2) {
               setShowNextButton(true);
@@ -508,8 +525,27 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       </div>
 
-      {/* NÚT TẬP TIẾP THEO TỰ ĐỘNG XUẤT HIỆN GẦN CUỐI PHIM */}
-      {showNextButton && onNext && (
+      {/* CHÈN THÊM: NÚT BỎ QUA GIỚI THIỆU CHUẨN NETFLIX (TỰ ĐỘNG ẨN SAU 45S ĐẦU PHIM) */}
+      {showSkipIntroButton && (
+        <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
+          <button
+            onClick={handleSkipIntro}
+            className="group flex items-center gap-3 bg-zinc-900/95 hover:bg-zinc-800 border border-zinc-700 px-5 py-2.5 rounded shadow-2xl transition-all active:scale-95 cursor-pointer"
+          >
+            <div className="text-left">
+              <p className="text-white text-xs font-bold">Bỏ qua giới thiệu</p>
+            </div>
+            <div className="bg-white text-black p-1.5 rounded-sm group-hover:bg-red-600 group-hover:text-white transition-colors">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5v14l8-7-8-7zm8 0v14l8-7-8-7z" />
+              </svg>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* NÚT TẬP TIẾP THEO TỰ ĐỘNG XUẤT HIỆN GẦN CUỐI PHIM (Né hiển thị đè nếu nút Skip Intro đang trồi lên) */}
+      {showNextButton && onNext && !showSkipIntroButton && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
           <button
             onClick={(e) => { e.stopPropagation(); onNext(); }}
