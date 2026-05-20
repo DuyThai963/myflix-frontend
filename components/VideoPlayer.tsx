@@ -9,13 +9,15 @@ type Props = {
   isSeries?: boolean;
   onNext?: () => void;
   onProgress?: (currentTime: number) => void;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 };
 
-export default function VideoPlayer({ src, movieId, isSeries = false, onNext, onProgress }: Props) {
+export default function VideoPlayer({ src, movieId, isSeries = false, onNext, onProgress, onFullscreenChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  const [videoFit, setVideoFit] = useState<"contain" | "cover">("contain");
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
@@ -63,7 +65,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
   };
 
-  // NÚT PHÓNG TO XOAY NGANG TUYỆT ĐỐI CHO IPHONE
+  // HÀM GIAN LẬN XOAY MÀN HÌNH ĐÈ BẸP TAB SAFARI IPHONE
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     const container = playerContainerRef.current;
@@ -73,23 +75,41 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
     if (isIPhone) {
       if (!isFullscreen) {
-        // CƯỜNG CHẾ XOAY NGANG VÀ FILL ĐẦY 100%: 
-        // Lấy chiều rộng bằng chiều cao màn hình thực tế (h-screen) và ngược lại để ép thành hình chữ nhật nằm ngang
+        const currentWidth = window.innerWidth;
+        const currentHeight = window.innerHeight;
+        
+        const maxEdge = Math.max(currentWidth, currentHeight);
+        const minEdge = Math.min(currentWidth, currentHeight);
+
         container.style.position = "fixed";
-        container.style.top = "50%";
-        container.style.left = "50%";
-        container.style.width = "100vh"; 
-        container.style.height = "100vw"; 
-        container.style.transform = "translate(-50%, -50%) rotate(90deg)"; // Xoay ngang góc 90 độ từ tâm
         container.style.zIndex = "999999";
         container.style.backgroundColor = "#000000";
+
+        // KIỂM TRA HƯỚNG MÁY THỰC TẾ KHI BẤM NÚT PHÓNG TO
+        const isCurrentlyPortrait = currentHeight > currentWidth;
+
+        if (isCurrentlyPortrait) {
+          container.style.top = "53%"; 
+          container.style.left = "50%";
+          container.style.width = `${maxEdge}px`;  
+          container.style.height = `${minEdge}px`; 
+          container.style.transform = "translate(-50%, -50%) rotate(90deg)";
+        } else {
+          container.style.top = "0";
+          container.style.left = "0";
+          container.style.width = "100vw";
+          container.style.height = "100vh";
+          container.style.transform = "none";
+        }
         
-        // Khóa cuộn trang web bên dưới để không bị trượt lung tung khi vuốt tua phim
+        window.scrollTo(0, 1);
         document.body.style.overflow = "hidden";
-        window.scrollTo(0, 0);
+        container.style.touchAction = "none";
+        
         setIsFullscreen(true);
+        if (onFullscreenChange) onFullscreenChange(true);
       } else {
-        // THOÁT XOAY NGANG TRẢ VỀ BAN ĐẦU
+        // THOÁT PHÓNG TO: Dọn sạch sành sanh inline style trả về trạng thái ban đầu
         container.style.position = "";
         container.style.top = "";
         container.style.left = "";
@@ -98,11 +118,13 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         container.style.transform = "";
         container.style.zIndex = "";
         container.style.backgroundColor = "";
+        container.style.touchAction = "";
         document.body.style.overflow = "";
+        
         setIsFullscreen(false);
+        if (onFullscreenChange) onFullscreenChange(false);
       }
     } else {
-      // ANDROID VÀ PC GIỮ NGUYÊN API GỐC
       if (!document.fullscreenElement) {
         if (container.requestFullscreen) {
           container.requestFullscreen().catch(() => {});
@@ -117,7 +139,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }
   };
 
-  // ĐỒNG BỘ TRỤC TOẠ ĐỘ KHI XOAY NGANG ĐỂ VUỐT KÉO TUA CHUẨN XÁC
   const handleTimelineUpdate = (clientX: number, clientY: number) => {
     const timeline = timelineRef.current;
     const video = videoRef.current;
@@ -125,15 +146,15 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
     const rect = timeline.getBoundingClientRect();
     const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+    const isIPhonePortraitFull = isIPhone && isFullscreen && (window.innerHeight > window.innerWidth);
     
     let percentage = 0;
 
-    // LƯU Ý CHÍ MẠNG: Khi iPhone bị xoay 90 độ, Trục X biến thành trục Y.
-    // Do đó phải lấy clientY trừ đi khoảng cách top để tính độ dài thanh quẹt ngón tay
-    if (isIPhone && isFullscreen) {
+    if (isIPhonePortraitFull) {
       const offsetY = clientY - rect.top;
       percentage = Math.max(0, Math.min(1, offsetY / rect.height));
     } else {
+      // Máy nằm ngang sẵn hoặc PC quẹt ngang là tua ngang chuẩn chỉ
       const offsetX = clientX - rect.left;
       percentage = Math.max(0, Math.min(1, offsetX / rect.width));
     }
@@ -142,6 +163,20 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     video.currentTime = newTime;
     setCurrentTime(newTime);
   };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+      setIsFullscreen(isFull);
+      if (onFullscreenChange) onFullscreenChange(isFull); // THÊM DÒNG NÀY ĐỂ ĐỒNG BỘ CHO PC
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -245,6 +280,10 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       ref={playerContainerRef}
       onMouseMove={handleUserInteraction}
       onMouseLeave={() => !isDragging && setShowControls(false)}
+      onTouchEnd={() => {
+        setIsDragging(false);
+        handleUserInteraction();
+      }}
       className="relative w-full h-full bg-black overflow-hidden group flex items-center justify-center select-none font-sans cursor-default"
     >
       {loading && (
@@ -260,7 +299,10 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         playsInline={true}
         webkit-playsinline="true"
         onClick={togglePlay}
-        className="w-full h-full object-contain cursor-pointer relative z-10"
+        style={{
+          aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
+          objectFit: "contain"
+        }}
         onLoadedData={() => setLoading(false)}
         onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
         onError={() => setLoading(false)}
@@ -273,9 +315,9 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
 
           if (isSeries && dur > 0) {
             const timeLeft = dur - current;
-            let skipTime = 45; 
-            if (dur > 3000) skipTime = 75; 
-            else if (dur > 1800) skipTime = 60; 
+            let skipTime = 150;
+            if (dur > 3000) skipTime = 210;
+            else if (dur > 1800) skipTime = 180;
 
             if (timeLeft <= skipTime && timeLeft > 2) {
               setShowNextButton(true);
@@ -306,7 +348,6 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
 
         <div onClick={(e) => e.stopPropagation()} className="w-full space-y-4 cursor-default">
-          {/* TIMELINE HỖ TRỢ CLICK VÀ VUỐT KÉO ĐÃ ĐỒNG BỘ ĐẢO TRỤC */}
           <div className="flex items-center gap-3 w-full group/timeline">
             <span className="text-zinc-400 text-xs font-medium tabular-nums min-w-[40px]">
               {formatTime(currentTime)}
@@ -317,12 +358,10 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
               onClick={(e) => handleTimelineUpdate(e.clientX, e.clientY)}
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => setIsDragging(false)}
-              
               onTouchStart={() => setIsDragging(true)}
               onTouchEnd={() => setIsDragging(false)}
               onTouchMove={(e) => {
                 if (e.touches.length > 0) {
-                  // Đọc đồng thời cả 2 toạ độ trục ngang dọc để hàm đảo trục xử lý ngón tay lúc xoay ngang
                   handleTimelineUpdate(e.touches[0].clientX, e.touches[0].clientY);
                 }
               }}
@@ -404,10 +443,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       {showNextButton && onNext && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300">
           <button
-            onClick={(e) => {
-              e.stopPropagation(); 
-              onNext();
-            }}
+            onClick={(e) => { e.stopPropagation(); onNext(); }}
             className="group flex items-center gap-3 bg-zinc-900/95 hover:bg-zinc-800 border border-zinc-700 px-5 py-2.5 rounded shadow-2xl transition-all active:scale-95 cursor-pointer"
           >
             <div className="text-left">

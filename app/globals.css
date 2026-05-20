@@ -20,7 +20,6 @@ body {
 }
 
 /* VÁ LỖ HỔNG ZOOM KHI BẤM ĐẠI VÀO KHOẢNG TRỐNG */
-/* Ép tất cả các khối chứa, tiêu đề phim, vùng text nhận diện cuộn trượt chứ không cho phép kích hoạt cử chỉ Zoom ngầm của hệ thống */
 main,
 section,
 h1, h2, h3, p,
@@ -28,53 +27,67 @@ h1, h2, h3, p,
   touch-action: pan-x pan-y !important;
 }
 
-/* Ẩn thanh cuộn mặc định */
 ::-webkit-scrollbar {
   display: none;
 }
 
-/* 1. MẶC ĐỊNH (Dành cho iPad, Máy chiếu, Điện thoại - Coarse Pointer) */
-.info-overlay, .remove-btn {
+.info-overlay, 
+.remove-btn {
   opacity: 1 !important;
 }
 
-/* 2. DÀNH RIÊNG CHO MÁY TÍNH (Fine Pointer - Có chuột) */
 @media (pointer: fine) {
-  /* Ẩn đi khi ở trạng thái bình thường */
-  .info-overlay, .remove-btn {
+  .info-overlay, 
+  .remove-btn {
     opacity: 0 !important;
+    transition: opacity 0.2s ease-in-out;
   }
   
-  /* Chỉ hiện khi di chuột (hover) vào thẻ cha có class 'group' */
   .group:hover .info-overlay, 
   .group:hover .remove-btn {
     opacity: 1 !important;
   }
 }
 
-/* 3. TỐI ƯU CUỘN CHO THIẾT BỊ CẢM ỨNG (iPad, Điện thoại) */
+/* 3. TỐI ƯU CUỘN TRƯỢT CHO THIẾT BỊ CẢM ỨNG (Gom gọn làm một) */
 @media (pointer: coarse) {
   html, body {
     -webkit-overflow-scrolling: touch;
   }
 }
 
-@media (pointer: coarse) {
-  html, body {
-    -webkit-overflow-scrolling: touch;
+/* ========================================================
+   LUỒNG PLAYER CUSTOM TỐI ƯU CAO CẤP DÀNH CHO IPHONE
+   ======================================================== */
+
+/* ÉP VIDEO BUNG TỶ LỆ CHUẨN KHI Ở CHẾ ĐỘ TOÀN MÀN HÌNH */
+video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+/* BẢO VỆ AN TOÀN TAI THỎ VÀ THANH HOME CHO IPHONE KHI XOAY NGANG VẬT LÝ */
+@media (orientation: landscape) and (max-width: 932px) {
+  .absolute.inset-0.bg-gradient-to-t {
+    padding: 1.5rem calc(1.5rem + env(safe-area-inset-right)) calc(1.5rem + env(safe-area-inset-bottom)) calc(1.5rem + env(safe-area-inset-left)) !important;
   }
 }
 
-/* DÁN THÊM VÀO DƯỚI CÙNG NÀY ĐỂ TRIỆT TIÊU NÚT BẤM ẨN */
-video::-webkit-media-controls {
-  display: none !important;
+video ~ .absolute.inset-0.bg-gradient-to-t,
+.relative:has(video) .absolute.inset-0.bg-gradient-to-t {
+  z-index: 2147483647 !important; 
 }
-video::-webkit-media-controls-enclosure {
-  display: none !important;
+
+/* Đảm bảo nút Tập Kế Tiếp luôn nổi lên trên cùng bề mặt phim */
+.animate-in.fade-in.slide-in-from-right-5 {
+  z-index: 2147483647 !important;
 }
-video::-webkit-media-controls-panel {
-  display: none !important;
-}
-video::-webkit-media-controls-start-playback-button {
-  display: none !important;
+
+/* KHÓA CHẶT NỀN WEBPAGE TUYỆT ĐỐI CHỈ KHI TRÌNH PHÁT ĐANG BẬT FIXED FULLSCREEN */
+body:has(.fixed.inset-0) {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100vw !important;
+  height: 100vh !important;
 }

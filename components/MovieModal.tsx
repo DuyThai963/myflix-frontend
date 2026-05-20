@@ -19,6 +19,9 @@ export default function MovieModal({ movie, onClose }: Props) {
   const [activeEpisodeName, setActiveEpisodeName] = useState("");
   const [isInMyList, setIsInMyList] = useState(false);
 
+  // DÙNG STATE NÀY ĐỂ QUẢN LÝ ẨN NÚT X KHI PHÓNG TO
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+
   useEffect(() => {
     if (!movie) return;
     try {
@@ -133,14 +136,11 @@ export default function MovieModal({ movie, onClose }: Props) {
     }
   };
 
-  // --- HÀM XỬ LÝ CHUYỂN TẬP TIẾP THEO THÔNG MINH ---
   const handleNextEpisode = () => {
-    if (episodes.length <= 1) return; // Nếu phim lẻ hoặc chỉ có 1 tập thì không làm gì cả
+    if (episodes.length <= 1) return;
 
-    // Tìm vị trí của tập hiện tại
     const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
     
-    // Nếu tìm thấy và chưa phải tập cuối cùng
     if (currentIdx !== -1 && currentIdx < episodes.length - 1) {
       const nextEp = episodes[currentIdx + 1];
       const nextUrl = nextEp.link_m3u8 || nextEp.link_embed;
@@ -153,7 +153,6 @@ export default function MovieModal({ movie, onClose }: Props) {
     }
   };
 
-  // Kiểm tra xem phim hiện tại có tập kế tiếp hay không
   const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
   const hasNextEpisode = episodes.length > 1 && currentIdx !== -1 && currentIdx < episodes.length - 1;
 
@@ -164,7 +163,7 @@ export default function MovieModal({ movie, onClose }: Props) {
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 bg-black/90 z-[999] flex items-center justify-center p-4 backdrop-blur-sm"
+      className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm select-none"
     >
       <motion.div
         onClick={(e) => e.stopPropagation()}
@@ -172,15 +171,23 @@ export default function MovieModal({ movie, onClose }: Props) {
         animate={{ scale: 1, opacity: 1 }}
         className="bg-zinc-950 rounded-xl overflow-hidden w-full max-w-5xl max-h-[95vh] flex flex-col relative border border-zinc-800 shadow-2xl"
       >
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 z-[100] bg-black/60 w-10 h-10 rounded-full hover:bg-white hover:text-black transition flex items-center justify-center text-xl"
-        >
-          ✕
-        </button>
+
+        {!isPlayerFullscreen && (
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            style={{ zIndex: 2147483647 }} 
+            className="absolute top-4 right-4 bg-black/70 hover:bg-white text-white hover:text-black w-10 h-10 rounded-full transition flex items-center justify-center text-xl shadow-2xl border border-zinc-700/50 cursor-pointer pointer-events-auto"
+          >
+            ✕
+          </button>
+        )}
 
         {/* Player Section */}
-        <div className="aspect-video bg-black w-full relative">
+        <div className="aspect-video bg-black w-full relative z-10">
           {loading ? (
             <div className="w-full h-full flex items-center justify-center">
               <div className="w-10 h-10 border-4 border-zinc-700 border-t-red-600 rounded-full animate-spin" />
@@ -190,24 +197,24 @@ export default function MovieModal({ movie, onClose }: Props) {
                src={streamUrl} 
                movieId={`${movie.id}-${activeEpisode}`} 
                onProgress={handleProgress}
-               /* Truyền trạng thái phim bộ (nếu tổng số tập > 1 và có tập tiếp theo) */
                isSeries={hasNextEpisode} 
-               /* Truyền hàm chuyển tập xuống cho VideoPlayer */
                onNext={handleNextEpisode} 
+               /* ĐỒNG BỘ NGƯỢC STATE FULLSCREEN LÊN MODAL MẸ */
+               onFullscreenChange={(isFullscreenNow) => setIsPlayerFullscreen(isFullscreenNow)}
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50">
               <span className="text-4xl mb-2">⚠️</span>
-              <p>Nguồn phát hiện tại chưa khả dụng hoặc chỉ có Trailer</p>
+              <p className="text-sm px-4 text-center">Nguồn phát hiện tại chưa khả dụng hoặc chỉ có Trailer</p>
             </div>
           )}
         </div>
 
         {/* Content Section */}
-        <div className="p-6 md:p-8 overflow-y-auto">
+        <div className="p-6 md:p-8 overflow-y-auto z-0 flex-1">
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-white leading-tight">
+              <h1 className="text-2xl md:text-4xl font-bold mb-3 text-white leading-tight">
                 {movie.title}
               </h1>
               
@@ -221,11 +228,11 @@ export default function MovieModal({ movie, onClose }: Props) {
               <div className="mb-6 flex items-center gap-4">
                 <button
                   onClick={toggleMyList}
-                  className="flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2 rounded-md font-bold transition border border-zinc-700 hover:border-white"
+                  className="flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2 rounded-md font-bold transition border border-zinc-700 hover:border-white text-sm"
                 >
                   {isInMyList ? (
                     <>
-                      <span className="text-xl">✓</span>
+                      <span className="text-green-500 text-lg">✓</span>
                       <span>Đã lưu vào danh sách</span>
                     </>
                   ) : (
@@ -237,7 +244,7 @@ export default function MovieModal({ movie, onClose }: Props) {
                 </button>
               </div>
 
-              <p className="text-zinc-400 leading-relaxed text-base md:text-lg">
+              <p className="text-zinc-400 leading-relaxed text-sm md:text-base">
                 {movie.description || "Chưa có mô tả cho bộ phim này."}
               </p>
             </div>
@@ -245,10 +252,10 @@ export default function MovieModal({ movie, onClose }: Props) {
             {/* Episode Selector */}
             {episodes.length > 0 && (
               <div className="md:w-80 w-full shrink-0">
-                <h3 className="text-sm font-bold mb-4 text-zinc-500 uppercase tracking-widest">
+                <h3 className="text-xs font-bold mb-4 text-zinc-500 uppercase tracking-widest">
                   Danh sách tập ({episodes.length})
                 </h3>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {episodes.map((ep, idx) => {
                   const isPlayable = ep.link_m3u8 && ep.link_m3u8.trim() !== "";
                   return (
@@ -264,7 +271,7 @@ export default function MovieModal({ movie, onClose }: Props) {
                           alert("Tập này không có link stream!");
                         }
                       }}
-                      className={`py-2 px-1 rounded text-xs font-bold transition truncate ${
+                      className={`py-2 px-1 rounded text-xs font-bold transition truncate cursor-pointer ${
                         !isPlayable ? "opacity-20 cursor-not-allowed bg-zinc-900" :
                         activeEpisode === ep.slug
                           ? "bg-red-600 text-white"
