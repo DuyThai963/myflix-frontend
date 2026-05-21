@@ -11,6 +11,22 @@ type Props = {
 
 export default function MovieCard({ movie, onClick, onRemove }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const getEpisodeTag = () => {
+    const current = movie.episode_current || "";
+    const total = movie.episode_total || "";
+    
+    if (current.toLowerCase().includes("trailer")) return { text: "Trailer", color: "bg-yellow-500" };
+    if (current.toLowerCase().includes("full")) return { text: "Full", color: "bg-green-600" };
+    
+    const currentNumber = parseInt(current.replace(/\D/g, ""));
+    const totalNumber = parseInt(total.replace(/\D/g, ""));
+
+    if (!isNaN(currentNumber) && !isNaN(totalNumber) && currentNumber >= totalNumber) {
+      return { text: "Full", color: "bg-green-600" };
+    }
+    return { text: current, color: "bg-purple-600" };
+  };
+  const tag = getEpisodeTag();
 
   useEffect(() => {
     const cardElement = cardRef.current;
@@ -64,6 +80,13 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
       "
       style={{ touchAction: "pan-x pan-y" }} // Đồng bộ inline style để Safari không hiểu lầm
     >
+      {tag && tag.text && (
+        <div 
+          className={` absolute top-2 left-2 ${tag.color} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-20
+            transition-opacity duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100 `}>
+          {tag.text}
+        </div>
+      )}
       {/* Poster phim */}
       <img
         src={movie.poster}

@@ -372,7 +372,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         onClick={(e) => e.stopPropagation()} 
         onTouchEnd={(e) => e.stopPropagation()} 
         style={{
-          transformStyle: "preserve-3d",
+          // transformStyle: "preserve-3d",
           transform: "translateZ(999px)",
         }}
         // 'pointer-events-none' cho phép cú click xuyên thẳng qua bảng điều khiển chạm trúng video nền

@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  allowedDevOrigins: ['192.168.0.102', 'localhost:3000'],
+  allowedDevOrigins: ['192.168.0.102', '192.168.0.101', 'localhost:3000'],
 };
 
 export default nextConfig;

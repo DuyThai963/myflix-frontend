@@ -20,4 +20,6 @@ export interface Movie {
   country?: string;
   slug: string;
   episodes?: Episode[];
+  episode_current: string;
+  episode_total: string;
 }

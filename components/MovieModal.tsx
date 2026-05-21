@@ -15,6 +15,8 @@ export default function MovieModal({ movie, onClose }: Props) {
   const [streamUrl, setStreamUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
+  const [episodeData, setEpisodeData] = useState<any[]>([]);
+  const [activeServer, setActiveServer] = useState<string>("");
   const [activeEpisode, setActiveEpisode] = useState("");
   const [activeEpisodeName, setActiveEpisodeName] = useState("");
   const [isInMyList, setIsInMyList] = useState(false);
@@ -61,7 +63,10 @@ export default function MovieModal({ movie, onClose }: Props) {
       try {
         const data = await movieService.getMovieDetail(movie.slug);
         if (data && data.episodes) {
-          const serverData = data.episodes[0]?.server_data || [];
+          setEpisodeData(data.episodes);
+          const firstServer = data.episodes[0];
+          setActiveServer(firstServer.server_name);
+          const serverData = firstServer.server_data || [];
           setEpisodes(serverData);
 
           if (serverData.length > 0) {
@@ -217,13 +222,31 @@ export default function MovieModal({ movie, onClose }: Props) {
               <h1 className="text-2xl md:text-4xl font-bold mb-3 text-white leading-tight">
                 {movie.title}
               </h1>
-              
+
               <div className="flex flex-wrap items-center gap-4 text-sm font-medium mb-6">
                 <span className="text-green-500 font-bold">{movie.year}</span>
                 <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{movie.duration}</span>
                 <span className="text-zinc-400">{movie.genre}</span>
                 <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
               </div>
+
+              {/* CHÈN ĐÚNG THANH CHỌN SERVER Ở ĐÂY */}
+              {episodeData.length > 1 && (
+                <div className="flex gap-2 mb-6">
+                  {episodeData.map((server) => (
+                    <button key={server.server_name} onClick={() => {
+                        setActiveServer(server.server_name);
+                        setEpisodes(server.server_data);
+                        const ep = server.server_data[0];
+                        setStreamUrl(ep.link_m3u8 || ep.link_embed);
+                        setActiveEpisode(ep.slug);
+                        setActiveEpisodeName(ep.name);
+                    }} className={`px-3 py-1 text-xs font-bold uppercase rounded border transition ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}>
+                      {server.server_name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="mb-6 flex items-center gap-4">
                 <button
