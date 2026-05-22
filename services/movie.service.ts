@@ -123,6 +123,8 @@ export const movieService = {
         duration: movie.time,
         country: movie.country?.[0]?.name || "Unknown",
         genre: movie.category?.[0]?.name || "Unknown",
+        episode_current: movie.episode_current,
+        episode_total: movie.episode_total,
       }));
     } catch (error) {
       console.error("Lỗi lấy phim:", error);

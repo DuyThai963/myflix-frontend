@@ -14,15 +14,27 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
   const getEpisodeTag = () => {
     const current = movie.episode_current || "";
     const total = movie.episode_total || "";
-    
-    if (current.toLowerCase().includes("trailer")) return { text: "Trailer", color: "bg-yellow-500" };
-    if (current.toLowerCase().includes("full")) return { text: "Full", color: "bg-green-600" };
+
+    if (current.toLowerCase().includes("trailer")) {
+      return { text: "Trailer", color: "bg-yellow-500" };
+    }
+
+    if (current.toLowerCase().includes("full")) {
+      return { text: "Full", color: "bg-green-600" };
+    }
     
     const currentNumber = parseInt(current.replace(/\D/g, ""));
     const totalNumber = parseInt(total.replace(/\D/g, ""));
 
-    if (!isNaN(currentNumber) && !isNaN(totalNumber) && currentNumber >= totalNumber) {
-      return { text: "Full", color: "bg-green-600" };
+    if (!isNaN(currentNumber) && !isNaN(totalNumber)) {
+      if (currentNumber >= totalNumber) {
+        return { text: `Hoàn tất (${currentNumber}/${totalNumber})`, color: "bg-green-600" };
+      }
+      return { text: `Tập ${currentNumber}/${totalNumber}`, color: "bg-purple-600" };
+    }
+
+    if (current.toLowerCase().includes("hoàn tất")) {
+      return { text: current, color: "bg-green-600" };
     }
     return { text: current, color: "bg-purple-600" };
   };
@@ -82,8 +94,16 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
     >
       {tag && tag.text && (
         <div 
-          className={` absolute top-2 left-2 ${tag.color} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-20
-            transition-opacity duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100 `}>
+          className={`
+            absolute top-2 left-2 ${tag.color} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-20
+            transition-opacity duration-300
+            /* Mặc định là hiện (Mobile/Máy chiếu) */
+            opacity-100
+            /* Trên PC (có chuột), ẩn đi và chờ hover */
+            [@media(pointer:fine)]:opacity-0 
+            group-hover:opacity-100
+          `}
+        >
           {tag.text}
         </div>
       )}
