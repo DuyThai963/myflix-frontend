@@ -6,12 +6,14 @@ export default function LoadingIntro({ isLoading }: { isLoading: boolean }) {
   const [shouldShow, setShouldShow] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldShow(false);
-    }, 4000);
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        setShouldShow(false);
+      }, 250);
 
-    return () => clearTimeout(timer);
-  }, []);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   const isEffectivelyLoading = shouldShow || isLoading;
 

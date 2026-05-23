@@ -15,7 +15,9 @@ export default function Navbar({ keyword, setKeyword }: Props) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -39,6 +41,63 @@ export default function Navbar({ keyword, setKeyword }: Props) {
     { name: "TV Shows", href: "/tv-shows" },
     { name: "My List", href: "/my-list" },
   ];
+
+  useEffect(() => {
+    const saved = localStorage.getItem("dt_search_history");
+    if (saved) {
+      setSearchHistory(JSON.parse(saved));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (keyword.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await fetch(`https://dtmyflix.onrender.com/api/search?keyword=${encodeURIComponent(keyword.trim())}`, {
+          signal: controller.signal
+        });
+        const data = await response.json();
+        if (data?.data?.items) {
+          setSuggestions(data.data.items.slice(0, 5));
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") console.error("Suggestions Error:", error);
+      }
+    }, 350);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [keyword]);
+
+  const handleSearchSubmit = (searchKey: string) => {
+    const cleanKey = searchKey.trim();
+    if (!cleanKey) return;
+
+    setSearchHistory((prev) => {
+      const next = [cleanKey, ...prev.filter((item) => item !== cleanKey)].slice(0, 5);
+      localStorage.setItem("dt_search_history", JSON.stringify(next));
+      return next;
+    });
+
+    setShowSuggestions(false);
+    router.push(`/search?q=${cleanKey}`);
+  };
+
+  const handleRemoveHistory = (e: React.MouseEvent, text: string) => {
+    e.stopPropagation();
+    setSearchHistory((prev) => {
+      const next = prev.filter((item) => item !== text);
+      localStorage.setItem("dt_search_history", JSON.stringify(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     // Xử lý đổi màu nền khi cuộn
@@ -67,6 +126,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
       // Nếu ô search đang mở VÀ vị trí click KHÔNG nằm trong cụm search container
       if (showSearch && searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowSearch(false);
+        setShowSuggestions(false);
       }
     };
 
@@ -168,8 +228,12 @@ export default function Navbar({ keyword, setKeyword }: Props) {
             {showSearch && (
               <input
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && keyword.trim() !== "" && router.push(`/search?q=${keyword.trim()}`)}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={(e) => e.key === "Enter" && keyword.trim() !== "" && handleSearchSubmit(keyword)}
                 placeholder="Search movies..."
                 className="bg-black/60 border border-zinc-700 px-3 py-1 rounded-full outline-none text-xs text-white w-32 md:w-48 focus:border-red-600 transition-all animate-in fade-in slide-in-from-right-3 duration-200"
                 autoFocus
@@ -180,8 +244,63 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               onClick={(e) => {
                 e.stopPropagation();
                 setShowSearch(!showSearch);
+                setShowSuggestions(!showSearch);
               }} 
             />
+
+            {showSuggestions && showSearch && (searchHistory.length > 0 || (keyword.trim().length >= 2 && suggestions.length > 0)) && (
+              <div className="absolute top-full right-0 w-64 md:w-80 bg-zinc-950/95 border border-zinc-800 rounded-lg mt-2 z-50 shadow-2xl p-2 flex flex-col gap-2 max-h-96 overflow-y-auto backdrop-blur-md">
+                {keyword.trim().length < 2 && searchHistory.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-1">Tìm kiếm gần đây</p>
+                    {searchHistory.map((text, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => {
+                          setKeyword(text);
+                          handleSearchSubmit(text);
+                        }}
+                        className="flex items-center justify-between text-xs text-zinc-300 hover:bg-zinc-900 px-2 py-1.5 rounded cursor-pointer group"
+                      >
+                        <span className="truncate">{text}</span>
+                        <button 
+                          onClick={(e) => handleRemoveHistory(e, text)}
+                          className="text-zinc-500 hover:text-red-500 transition-colors px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {keyword.trim().length >= 2 && suggestions.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-1">Gợi ý phim</p>
+                    {suggestions.map((movie: any) => (
+                      <div
+                        key={movie._id || movie.slug}
+                        onClick={() => {
+                          handleSearchSubmit(movie.name);
+                          setShowSuggestions(false);
+                        }}
+                        className="flex items-center gap-2 p-1.5 hover:bg-zinc-900 rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
+                      >
+                        <img 
+                          src={movie.thumb_url.startsWith('http') ? movie.thumb_url : `https://img.ophim.live/uploads/movies/${movie.thumb_url}`} 
+                          alt={movie.name} 
+                          className="w-7 aspect-[2/3] rounded object-cover flex-shrink-0" 
+                        />
+                        <div className="flex flex-col truncate">
+                          <span className="text-xs font-semibold text-white truncate">{movie.name}</span>
+                          <span className="text-[10px] text-zinc-400">{movie.year} | {movie.episode_current || "Full"}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <FaBell className="hidden lg:block cursor-pointer text-gray-300 hover:text-white transition-colors text-lg" />

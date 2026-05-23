@@ -32,6 +32,11 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
   const [isDragging, setIsDragging] = useState(false);
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showLeftRipple, setShowLeftRipple] = useState(false);
+  const [showRightRipple, setShowRightRipple] = useState(false);
+  const leftRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rightRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleUserInteraction = () => {
     setShowControls(true);
@@ -301,10 +306,43 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
     }
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+      if (leftRippleTimeoutRef.current) clearTimeout(leftRippleTimeoutRef.current);
+      if (rightRippleTimeoutRef.current) clearTimeout(rightRippleTimeoutRef.current);
     };
   }, [isPlaying]);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const handleVideoClickWrapper = (e: React.MouseEvent) => {
+    if (e.detail === 1) {
+      clickTimeoutRef.current = setTimeout(() => {
+        togglePlay();
+      }, 250);
+    } else if (e.detail === 2) {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+      
+      if (!videoRef.current) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const width = rect.width;
+
+      handleUserInteraction();
+
+      if (clickX > width / 2) {
+        videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+        setShowRightRipple(true);
+        if (rightRippleTimeoutRef.current) clearTimeout(rightRippleTimeoutRef.current);
+        rightRippleTimeoutRef.current = setTimeout(() => setShowRightRipple(false), 500);
+      } else {
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+        setShowLeftRipple(true);
+        if (leftRippleTimeoutRef.current) clearTimeout(leftRippleTimeoutRef.current);
+        leftRippleTimeoutRef.current = setTimeout(() => setShowLeftRipple(false), 500);
+      }
+    }
+  };
 
   return (
     <div 
@@ -323,49 +361,75 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       )}
 
-      <video
-        ref={videoRef}
-        controls={false} 
-        autoPlay
-        playsInline={true}
-        webkit-playsinline="true"
-        onClick={togglePlay}
-        style={{
-          aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
-          objectFit: "contain"
-        }}
-        onLoadedData={() => setLoading(false)}
-        onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
-        onError={() => setLoading(false)}
-        onTimeUpdate={(e) => {
-          const video = e.target as HTMLVideoElement;
-          const current = video.currentTime;
-          const dur = video.duration;
-          setCurrentTime(current);
-          if (onProgress) onProgress(current);
-          if (current >= 3 && current < 45) {
-            setShowSkipIntroButton(true);
-          } else {
-            setShowSkipIntroButton(false);
-          }
-
-          if (isSeries && dur > 0) {
-            const timeLeft = dur - current;
-            let skipTime = 135;
-            if (dur > 3000) skipTime = 210;
-            else if (dur > 1800) skipTime = 165;
-
-            if (timeLeft <= skipTime && timeLeft > 2) {
-              setShowNextButton(true);
+      <div 
+        onClick={handleVideoClickWrapper}
+        className="relative w-full h-full flex items-center justify-center cursor-pointer"
+      >
+        <video
+          ref={videoRef}
+          controls={false} 
+          autoPlay
+          playsInline={true}
+          webkit-playsinline="true"
+          style={{
+            aspectRatio: videoRef.current ? `${videoRef.current.videoWidth} / ${videoRef.current.videoHeight}` : "auto",
+            objectFit: "contain"
+          }}
+          onLoadedData={() => setLoading(false)}
+          onDurationChange={(e) => setDuration((e.target as HTMLVideoElement).duration)}
+          onError={() => setLoading(false)}
+          onTimeUpdate={(e) => {
+            const video = e.target as HTMLVideoElement;
+            const current = video.currentTime;
+            const dur = video.duration;
+            setCurrentTime(current);
+            if (onProgress) onProgress(current);
+            if (current >= 3 && current < 45) {
+              setShowSkipIntroButton(true);
             } else {
-              setShowNextButton(false);
+              setShowSkipIntroButton(false);
             }
-          }
-        }}
-        onEnded={() => {
-          if (isSeries && onNext) onNext();
-        }}
-      />
+
+            if (isSeries && dur > 0) {
+              const timeLeft = dur - current;
+              let skipTime = 135;
+              if (dur > 3000) skipTime = 210;
+              else if (dur > 1800) skipTime = 165;
+
+              if (timeLeft <= skipTime && timeLeft > 2) {
+                setShowNextButton(true);
+              } else {
+                setShowNextButton(false);
+              }
+            }
+          }}
+          onEnded={() => {
+            if (isSeries && onNext) onNext();
+          }}
+        />
+
+        {/* Sương mờ LÙI PHIM (Bên trái) */}
+        <div className={`absolute top-0 left-0 w-1/2 h-full bg-white/5 flex flex-col items-center justify-center pointer-events-none rounded-r-[40%] transition-all duration-500 ease-out z-10 ${showLeftRipple ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+          <div className="bg-black/40 p-4 rounded-full flex flex-col items-center justify-center gap-1 min-w-[70px] aspect-square">
+            {/* Logo Mũi Tên Lùi Chuẩn YouTube */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white animate-pulse">
+              <path d="M11 17l-5-5 5-5v10zm6 0l-5-5 5-5v10z" />
+            </svg>
+            <span className="text-white font-extrabold text-[11px] tracking-wide">-10s</span>
+          </div>
+        </div>
+
+        {/* Sương mờ TIẾN PHIM (Bên phải) */}
+        <div className={`absolute top-0 right-0 w-1/2 h-full bg-white/5 flex flex-col items-center justify-center pointer-events-none rounded-l-[40%] transition-all duration-500 ease-out z-10 ${showRightRipple ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+          <div className="bg-black/40 p-4 rounded-full flex flex-col items-center justify-center gap-1 min-w-[70px] aspect-square">
+            {/* Logo Mũi Tên Tiến Chuẩn YouTube */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white animate-pulse">
+              <path d="M13 7l5 5-5 5V7zm-6 0l5 5-5 5V7z" />
+            </svg>
+            <span className="text-white font-extrabold text-[11px] tracking-wide">+10s</span>
+          </div>
+        </div>
+      </div>
 
       {/* BỘ CONTROLS PANEL (z-40): Ép tầng đồ họa ma trận 3D độc lập chống lỗi dính nút/nuốt nút trên iPad */}
       <div 
