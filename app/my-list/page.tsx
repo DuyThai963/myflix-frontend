@@ -11,13 +11,20 @@ export default function MyList() {
   const [myList, setMyList] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [keyword, setKeyword] = useState("");
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
 
   // Hàm load dữ liệu từ localStorage
   const loadMyList = () => {
     try {
       const listData = localStorage.getItem("myflix_mylist");
       if (listData) {
-        setMyList(JSON.parse(listData));
+        let parsedList = JSON.parse(listData);
+        if (parsedList.length > 20) {
+          parsedList = parsedList.slice(0, 20);
+          localStorage.setItem("myflix_mylist", JSON.stringify(parsedList));
+        }
+        
+        setMyList(parsedList);
       } else {
         setMyList([]);
       }
@@ -66,7 +73,49 @@ export default function MyList() {
       <Navbar keyword={keyword} setKeyword={setKeyword} />
 
       <div className="flex-1 px-6 md:px-12 pt-32 pb-12">
-        <h1 className="text-3xl font-bold mb-8">Danh sách của tôi</h1>
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Danh sách của tôi
+          </h1>
+          
+          {myList.length > 0 && (
+            <>
+              {!isConfirmingClear ? (
+                <button
+                  onClick={() => setIsConfirmingClear(true)}
+                  className="px-4 py-2 text-xs md:text-sm font-semibold text-zinc-400 hover:text-red-500 bg-zinc-900/60 hover:bg-red-950/30 border border-zinc-800 hover:border-red-900/50 rounded-md transition duration-200 cursor-pointer"
+                >
+                  🗑️ Xóa tất cả
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+                  <span className="text-xs text-zinc-500 font-medium">Bạn chắc chắn chứ?</span>
+                  <button
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem("myflix_mylist");
+                        setMyList([]);
+                        setIsConfirmingClear(false);
+                        window.dispatchEvent(new Event("myflix_mylist_updated"));
+                      } catch (e) {
+                        console.error("Lỗi khi xóa tất cả My List", e);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold uppercase bg-red-600 hover:bg-red-700 text-white rounded transition cursor-pointer"
+                  >
+                    Có, xóa hết
+                  </button>
+                  <button
+                    onClick={() => setIsConfirmingClear(false)}
+                    className="px-3 py-1.5 text-xs font-bold uppercase bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded transition cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {filteredList.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

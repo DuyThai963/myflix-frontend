@@ -48,6 +48,9 @@ export default function MovieModal({ movie, onClose }: Props) {
       } else {
         myList.unshift(movie);
         setIsInMyList(true);
+        if (myList.length > 20) {
+          myList = myList.slice(0, 20); 
+        }
       }
       localStorage.setItem("myflix_mylist", JSON.stringify(myList));
       window.dispatchEvent(new Event("myflix_mylist_updated"));
@@ -131,9 +134,11 @@ export default function MovieModal({ movie, onClose }: Props) {
         updatedAt: new Date().toISOString()
       };
 
-      history = history.filter((h: any) => h.movie.id !== movie.id);
+      history = history.filter((h: any) => h.watchId !== currentWatch.watchId);
       history.unshift(currentWatch);
-      if (history.length > 20) history.pop();
+      if (history.length > 20) {
+        history = history.slice(0, 20); 
+      }
 
       localStorage.setItem("myflix_history", JSON.stringify(history));
     } catch (e) {

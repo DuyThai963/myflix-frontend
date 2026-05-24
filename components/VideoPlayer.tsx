@@ -271,7 +271,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       const historyData = localStorage.getItem("myflix_history");
       if (historyData) {
         const history = JSON.parse(historyData);
-        const found = history.find((h: any) => h.watchId === String(movieId));
+        const found = history.find((h: any) => String(h.watchId) === String(movieId));
         if (found) savedTime = found.currentTime;
       }
     } catch(e) {}
