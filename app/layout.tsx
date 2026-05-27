@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ZoomBlocker from "@/components/ZoomBlocker"; // IMPORT THẰNG NÀY VÀO
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-black text-white selection:bg-red-600 selection:text-white">
         <ZoomBlocker /> 
         {children}
+        <Analytics />
       </body>
     </html>
   );
