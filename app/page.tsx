@@ -57,8 +57,21 @@ export default function Home() {
     const loadHistory = () => {
       try {
         const historyData = localStorage.getItem("myflix_history");
-        setContinueWatching(historyData ? JSON.parse(historyData).map((h: any) => h.movie) : []);
-      } catch (e) { console.error("Lỗi đọc lịch sử", e); }
+        if (historyData) {
+          const parsedHistory = JSON.parse(historyData);
+          const uniqueMoviesMap = new Map();
+          parsedHistory.forEach((item: any) => {
+            if (item?.movie?.id && !uniqueMoviesMap.has(item.movie.id)) {
+              uniqueMoviesMap.set(item.movie.id, item.movie);
+            }
+          });
+          setContinueWatching(Array.from(uniqueMoviesMap.values()));
+        } else {
+          setContinueWatching([]);
+        }
+      } catch (e) { 
+        console.error("Lỗi đọc lịch sử", e); 
+      }
     };
     loadHistory();
     window.addEventListener("myflix_history_updated", loadHistory);
