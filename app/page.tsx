@@ -6,6 +6,7 @@ import MovieRow from "@/components/MovieRow";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import LoadingIntro from "@/components/LoadingIntro";
+import { HeroSkeleton, RowSkeleton } from "@/components/Skeletons";
 
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
@@ -17,6 +18,8 @@ export default function Home() {
   const [continueWatching, setContinueWatching] = useState<Movie[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [isIntroLoading, setIsIntroLoading] = useState(true);
+  const [mountIntro, setMountIntro] = useState(false);
+  const [isMoviesLoading, setIsMoviesLoading] = useState(true);
 
   // Fetch dữ liệu từ API Home
   useEffect(() => {
@@ -27,11 +30,41 @@ export default function Home() {
       } catch (error) {
         console.error("Lỗi fetch movies", error);
       } finally {
-        setTimeout(() => setIsIntroLoading(false), 1000);
+        setIsMoviesLoading(false);
       }
     };
     fetchMovies();
   }, []);
+
+  useEffect(() => {
+    const hasSeenIntro = sessionStorage.getItem("myflix_has_seen_intro");
+
+    if (!hasSeenIntro) {
+      setMountIntro(true);
+      const introTimer = setTimeout(() => {
+        setIsIntroLoading(false);
+        sessionStorage.setItem("myflix_has_seen_intro", "true");
+      }, 2500);
+
+      return () => clearTimeout(introTimer);
+    } else {
+      setIsIntroLoading(false);
+      setMountIntro(false); 
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log("[INTRO] isIntroLoading:", isIntroLoading);
+    if (isIntroLoading) {
+      sessionStorage.setItem("myflix_has_seen_intro", "true");
+      const introTimer = setTimeout(() => {
+        console.log("[INTRO] Intro ended");
+        setIsIntroLoading(false);
+      }, 2500);
+
+      return () => clearTimeout(introTimer);
+    }
+  }, [isIntroLoading]);
 
   // Logic nhóm phim tự động theo danh mục
   const movieSections = useMemo(() => {
@@ -89,31 +122,44 @@ export default function Home() {
 
   return (
     <>
-      <LoadingIntro isLoading={isIntroLoading} />
+      {mountIntro && <LoadingIntro isLoading={isIntroLoading} />}
       <main className="bg-black min-h-screen text-white">
         <Navbar keyword={keyword} setKeyword={setKeyword} />
 
-        {movies.length > 0 && <HeroBanner movie={movies[0]} />}
+        {isMoviesLoading ? (
+          <>
+            <HeroSkeleton />
+            <div className="-mt-24 relative z-20">
+              <RowSkeleton />
+              <RowSkeleton />
+              <RowSkeleton />
+            </div>
+          </>
+        ) : (
+          <>
+            {movies.length > 0 && <HeroBanner movie={movies[0]} />}
 
-        <div className="-mt-24 relative z-20">
-          {continueWatching.length > 0 && (
-            <MovieRow
-              title="Continue Watching"
-              movies={continueWatching}
-              onSelectMovie={setSelectedMovie}
-              onRemoveMovie={handleRemoveHistory}
-            />
-          )}
+            <div className="-mt-24 relative z-20">
+              {continueWatching.length > 0 && (
+                <MovieRow
+                  title="Continue Watching"
+                  movies={continueWatching}
+                  onSelectMovie={setSelectedMovie}
+                  onRemoveMovie={handleRemoveHistory}
+                />
+              )}
 
-          {movieSections.map((section, index) => (
-            <MovieRow
-              key={index}
-              title={section.title}
-              movies={section.movies}
-              onSelectMovie={setSelectedMovie}
-            />
-          ))}
-        </div>
+              {movieSections.map((section, index) => (
+                <MovieRow
+                  key={index}
+                  title={section.title}
+                  movies={section.movies}
+                  onSelectMovie={setSelectedMovie}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         <MovieModal
           movie={selectedMovie}
