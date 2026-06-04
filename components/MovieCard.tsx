@@ -108,12 +108,18 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         </div>
       )}
       {/* Poster phim */}
-      <img
-        src={movie.poster}
-        alt={movie.title}
-        className="w-full h-full object-cover object-top pointer-events-none select-none unselectable"
-        draggable="false"
-      />
+      {movie.poster ? (
+        <img
+          src={movie.poster}
+          alt={movie.title}
+          className="w-full h-full object-cover object-top pointer-events-none select-none unselectable"
+          draggable="false"
+        />
+      ) : (
+        <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
+          <span className="text-zinc-500 text-sm">No Image</span>
+        </div>
+      )}
 
       {/* Nút xóa - Giữ nguyên vẹn */}
       {onRemove && (

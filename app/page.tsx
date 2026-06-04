@@ -11,6 +11,7 @@ import { HeroSkeleton, RowSkeleton } from "@/components/Skeletons";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
 import { useEffect, useMemo, useState } from "react";
+import { socket } from "@/services/socket.service";
 
 export default function Home() {
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
@@ -20,6 +21,52 @@ export default function Home() {
   const [isIntroLoading, setIsIntroLoading] = useState(true);
   const [mountIntro, setMountIntro] = useState(false);
   const [isMoviesLoading, setIsMoviesLoading] = useState(true);
+
+  useEffect(() => {
+    socket.connect();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get("room");
+
+    if (!roomId) {
+      setSelectedMovie(null);
+      return;
+    }
+    const userName = `ChiếnHữu_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    socket.emit("join_room", { roomId, userName });
+
+    const handleRoomState = (data: any) => {
+      if (data && data.movieState && data.movieState.slug) {
+        setSelectedMovie({
+          id: data.movieState.id || data.roomId,
+          slug: data.movieState.slug,
+          title: data.movieState.title,
+          origin_name: "",
+          thumb_url: "",
+          poster_url: "",
+          year: 2026,
+          duration: "",
+          genre: "",
+          country: "",
+          description: ""
+        });
+      }
+    };
+
+    const handleRoomError = (err: any) => {
+      alert(`⚠️ Lỗi phòng: ${err.message}`);
+      window.location.href = "/";
+    };
+
+    socket.on("room_state", handleRoomState);
+    socket.on("room_error", handleRoomError);
+
+    return () => {
+      socket.off("room_state", handleRoomState);
+      socket.off("room_error", handleRoomError);
+    };
+  }, []);
 
   // Fetch dữ liệu từ API Home
   useEffect(() => {
@@ -161,13 +208,18 @@ export default function Home() {
           </>
         )}
 
-        <MovieModal
-          movie={selectedMovie}
-          onClose={() => {
-            setSelectedMovie(null);
-            window.dispatchEvent(new Event("myflix_history_updated"));
-          }}
-        />
+        {selectedMovie && (
+          <MovieModal
+            movie={selectedMovie}
+            onClose={() => {
+              setSelectedMovie(null);
+              window.dispatchEvent(new Event("myflix_history_updated"));
+              if (window.location.search.includes("room=")) {
+                window.history.pushState({}, "", window.location.pathname);
+              }
+            }}
+          />
+        )}
         <Footer />
       </main>
     </>

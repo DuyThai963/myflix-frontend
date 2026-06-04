@@ -10,9 +10,10 @@ type Props = {
   onNext?: () => void;
   onProgress?: (currentTime: number) => void;
   onFullscreenChange?: (isFullscreen: boolean) => void;
+  initialTime?: number;
 };
 
-export default function VideoPlayer({ src, movieId, isSeries = false, onNext, onProgress, onFullscreenChange }: Props) {
+export default function VideoPlayer({ src, movieId, isSeries = false, onNext, onProgress, onFullscreenChange, initialTime = 0 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
   const [showRightRipple, setShowRightRipple] = useState(false);
   const leftRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rightRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasSyncedInitialTimeRef = useRef<string>("");
 
   const handleUserInteraction = () => {
     setShowControls(true);
@@ -284,7 +286,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         video.play().catch(() => {});
         setLoading(false);
       }, { once: true });
-      return () => { video.src = ""; }
+      return () => { video.removeAttribute('src'); }
     } 
     else if (Hls.isSupported()) {
       const hls = new Hls();
@@ -311,6 +313,49 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
       if (rightRippleTimeoutRef.current) clearTimeout(rightRippleTimeoutRef.current);
     };
   }, [isPlaying]);
+
+  useEffect(() => {
+    if (initialTime <= 0 || !src) return;
+
+    const sessionKey = `${movieId}-${initialTime}`;
+    if (hasSyncedInitialTimeRef.current === sessionKey) return;
+
+    const video = videoRef.current;
+    let attempts = 0;
+
+    const seekPolling = setInterval(() => {
+      attempts++;
+      if (video) {
+        if (video.readyState >= 1) {
+          const diff = Math.abs(video.currentTime - initialTime);
+
+          if (diff > 3 && attempts <= 20) {
+            video.pause(); 
+            setIsPlaying(false);
+            video.currentTime = initialTime;
+            setCurrentTime(initialTime);
+          } else {
+            hasSyncedInitialTimeRef.current = sessionKey; // KHÓA VAN VĨNH VIỄN
+            clearInterval(seekPolling);
+
+            video.play()
+              .then(() => {
+                setIsPlaying(true);
+              })
+              .catch(() => {
+                video.muted = true;
+                setIsMuted(true);
+                video.play().then(() => setIsPlaying(true));
+              });
+          }
+        } else {
+          if (attempts > 20) clearInterval(seekPolling);
+        }
+      }
+    }, 400);
+
+    return () => clearInterval(seekPolling);
+  }, [initialTime, src, movieId]);
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const handleVideoClickWrapper = (e: React.MouseEvent) => {
@@ -431,18 +476,16 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       </div>
 
-      {/* BỘ CONTROLS PANEL (z-40): Ép tầng đồ họa ma trận 3D độc lập chống lỗi dính nút/nuốt nút trên iPad */}
+      {/* BỘ CONTROLS PANEL (z-40) */}
       <div 
         onClick={(e) => e.stopPropagation()} 
         onTouchEnd={(e) => e.stopPropagation()} 
         style={{
-          // transformStyle: "preserve-3d",
           transform: "translateZ(999px)",
         }}
-        // 'pointer-events-none' cho phép cú click xuyên thẳng qua bảng điều khiển chạm trúng video nền
         className={`absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 pointer-events-none ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0"}`}
       >
-        {/* Top bar (Nút thoát Fullscreen chỉ xuất hiện độc quyền khi xem trên PC chuột) */}
+        {/* Top bar */}
         <div className="flex items-center justify-between w-full relative z-50">
           {isFullscreen ? (
             <button 
@@ -456,7 +499,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
           <div />
         </div>
 
-        {/* Bottom bar (Ép cứng pointer-events-auto để tương tác mượt mà thanh timeline và bộ nút) */}
+        {/* Bottom bar */}
         <div 
           onClick={(e) => e.stopPropagation()} 
           onTouchEnd={(e) => e.stopPropagation()} 
@@ -543,7 +586,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
               </button>
             </div>
             
-            {/* Nút Phóng to / Thu nhỏ đồng bộ đúng theo biến isFullscreen */}
+            {/* Nút Phóng to / Thu nhỏ */}
             <div className="flex items-center gap-5 relative z-50">
               <button onClick={(e) => toggleFullscreen(e)} className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1 pointer-events-auto">
                 {isFullscreen ? (
@@ -561,7 +604,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       </div>
 
-      {/* CHÈN THÊM: NÚT BỎ QUA GIỚI THIỆU CHUẨN NETFLIX (TỰ ĐỘNG ẨN SAU 45S ĐẦU PHIM) */}
+      {/* NÚT BỎ QUA GIỚI THIỆU CHUẨN NETFLIX */}
       {showSkipIntroButton && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
           <button
@@ -580,7 +623,7 @@ export default function VideoPlayer({ src, movieId, isSeries = false, onNext, on
         </div>
       )}
 
-      {/* NÚT TẬP TIẾP THEO TỰ ĐỘNG XUẤT HIỆN GẦN CUỐI PHIM (Né hiển thị đè nếu nút Skip Intro đang trồi lên) */}
+      {/* NÚT TẬP TIẾP THEO TỰ ĐỘNG XUẤT HIỆN GẦN CUỐI PHIM */}
       {showNextButton && onNext && !showSkipIntroButton && (
         <div className="absolute bottom-24 right-8 z-50 animate-in fade-in slide-in-from-right-5 duration-300 pointer-events-auto">
           <button

@@ -1,0 +1,332 @@
+"use client";
+import { useEffect, useState } from "react";
+import { socket } from "@/services/socket.service";
+import { Movie } from "@/types/movie";
+
+interface Room {
+  roomId: string;
+  roomName: string;
+  movieState: {
+    title: string;
+    episode: string;
+    currentTime: number;
+  };
+  users: any[];
+}
+
+export default function WatchPartyHub() {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [roomName, setRoomName] = useState("");
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Movie[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+
+  // 🔥 ĐỒNG BỘ LUỒNG SẢNH HUB TẬP TRUNG
+  useEffect(() => {
+    // Chỉ kết nối và đòi danh sách phòng khi ở ngoài sảnh Hub
+    if (!socket.connected) {
+      socket.connect();
+    }
+    
+    socket.emit("get_active_rooms");
+
+    socket.on("active_rooms_list", (data: Room[]) => {
+      setRooms(data);
+    });
+
+    // 🚀 SỬA LỖI CHÍ MẠNG: Tự động bốc đầu người tạo phòng bay thẳng vào trang xem phim chung
+    socket.on("room_created_success", ({ roomId, hostToken }) => {
+      try {
+        localStorage.setItem(`myflix_host_of_${roomId}`, "true");
+        localStorage.setItem(`myflix_token_of_${roomId}`, hostToken);
+      } catch (e) {}
+      
+      // Điều hướng nóng sang trang xem phim chung đính kèm mã phòng lên URL băm mốc
+      window.location.href = `/watch-party?room=${roomId}`;
+    });
+
+    return () => {
+      socket.off("active_rooms_list");
+      socket.off("room_created_success");
+    };
+  }, []);
+
+  // Gọi API tìm kiếm phim định thời Debounce giữ nguyên vẹn
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const response = await fetch(`https://dtmyflix.onrender.com/api/search?keyword=${encodeURIComponent(searchQuery)}`);
+        const resData = await response.json();
+        
+        if (resData && resData.status === "success" && resData.data && resData.data.items) {
+          setSearchResults(resData.data.items);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error("Lỗi tìm kiếm phim tạo phòng:", error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const handleCreateRoom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roomName.trim() || !selectedMovie) {
+      alert("Vui lòng điền tên phòng và chọn một bộ phim!");
+      return;
+    }
+
+    // Bắn lệnh tạo phòng âm thầm lên RAM server
+    socket.emit("create_room", {
+      roomName,
+      movieInfo: {
+        slug: selectedMovie.slug,
+        title: selectedMovie.title,
+        episode: "Tập 1", 
+        currentTime: 0    
+      }
+    });
+
+    setShowCreateModal(false);
+    setRoomName("");
+    setSelectedMovie(null);
+    setSearchQuery("");
+  };
+
+  const handleShareRoom = (roomId: string, roomName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareLink = `${window.location.origin}/watch-party?room=${roomId}`;
+    navigator.clipboard.writeText(shareLink);
+    alert(`🔗 Đã copy link phòng [${roomName}]!\nHãy gửi link này cho bạn bè để cùng vào cày phim nhé:\n${shareLink}`);
+  };
+
+  const handleDeleteRoom = (roomId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const hostToken = localStorage.getItem(`myflix_token_of_${roomId}`);
+    if (confirm("⚠️ Bạn có chắc chắn muốn xóa phòng này không? Toàn bộ người xem sẽ bị mời ra ngoài.")) {
+      socket.emit("delete_room", { roomId, hostToken });
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-12 bg-zinc-950 min-h-screen text-white mt-16 select-none animate-in fade-in duration-300">
+      <div className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent">Watch Party Hub</h1>
+          <p className="text-zinc-400 text-xs md:text-sm mt-1.5">Nơi kết nối và xem phim thời gian thực cùng nhau</p>
+        </div>
+        <button 
+          onClick={() => setShowCreateModal(true)}
+          className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-md text-sm transition-all shadow-lg shadow-red-900/20 active:scale-95 cursor-pointer"
+        >
+          Tạo Phòng Mới
+        </button>
+      </div>
+
+      <div className="max-w-7xl mx-auto">
+        {rooms.length === 0 ? (
+          <div className="text-center py-24 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20 backdrop-blur-sm">
+            <span className="text-4xl block mb-3">🍿</span>
+            <p className="text-zinc-500 text-sm font-medium">Hiện chưa có phòng nào hoạt động. Hãy là người đầu tiên tạo phòng!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {rooms.map((room) => {
+              const amITheHost = typeof window !== "undefined" && localStorage.getItem(`myflix_host_of_${room.roomId}`) === "true";
+
+              return (
+                <div key={room.roomId} className="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-xl flex flex-col justify-between hover:border-zinc-700 hover:bg-zinc-900 transition-all duration-300 relative group shadow-xl">
+                  <div>
+                    <div className="flex justify-between items-center gap-3">
+                      <h3 className="text-lg font-bold text-red-500 truncate flex-1 tracking-wide">{room.roomName}</h3>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button 
+                          type="button"
+                          onClick={(e) => handleShareRoom(room.roomId, room.roomName, e)}
+                          className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors text-[11px] font-bold bg-zinc-950 px-2 py-1 border border-zinc-800/60 cursor-pointer active:scale-95"
+                          title="Chia sẻ link phòng"
+                        >
+                          🔗 Share
+                        </button>
+
+                        { amITheHost && (
+                          <button 
+                            type="button"
+                            onClick={(e) => handleDeleteRoom(room.roomId, e)}
+                            className="text-zinc-500 hover:text-red-500 p-1 rounded-md transition-colors text-[11px] font-bold bg-zinc-950 px-2 py-1 border border-zinc-800/60 cursor-pointer active:scale-95"
+                            title="Xóa phòng này"
+                          >
+                            🗑️ Xóa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 space-y-1.5 text-xs text-zinc-400 border-t border-zinc-800/40 pt-3">
+                      <p className="truncate">🎬 Phim: <span className="font-bold text-zinc-200">{room.movieState?.title || "N/A"}</span></p>
+                      <p>🎞️ Tập: <span className="text-zinc-300 font-medium">{room.movieState?.episode || "1"}</span></p>
+                      <p>⏱️ Thời lượng: <span className="text-zinc-300 font-medium">{Math.floor((room.movieState?.currentTime || 0) / 60)} phút</span></p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 flex justify-between items-center pt-4 border-t border-zinc-800/60">
+                    <span className="text-xs text-zinc-500 font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                      {room.users?.length || 0} người đang xem
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => window.location.href = `/watch-party?room=${room.roomId}`}
+                      className="bg-white text-black font-extrabold px-4 py-1.5 rounded-md text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 cursor-pointer shadow-md"
+                    >
+                      Vào Xem
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
+          <form onSubmit={handleCreateRoom} className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl w-full max-w-md mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-bold mb-5 tracking-wide text-zinc-100">Cấu Hình Phòng Xem Chung</h2>
+            
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-2">Tên Phòng</label>
+              <input 
+                type="text" 
+                required
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+                placeholder="Nhập tên phòng của bạn..."
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-2.5 text-sm text-white focus:outline-none focus:border-red-600 transition-colors placeholder:text-zinc-600"
+              />
+            </div>
+
+            <div className="mb-4 relative">
+              <label className="block text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-2">Tìm & Chọn phim xem chung</label>
+              
+              {selectedMovie ? (
+                <div className="flex justify-between items-center bg-zinc-950 p-3 rounded-md border border-red-900/30 mt-2 animate-in fade-in duration-200">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="text-sm font-bold text-white truncate">{selectedMovie.title}</p>
+                    <p className="text-xs text-zinc-500 truncate mt-0.5">{selectedMovie.origin_name}</p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedMovie(null)} 
+                    className="text-red-500 hover:text-red-400 text-xs font-bold shrink-0 cursor-pointer"
+                  >
+                    Thay Đổi
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Gõ tên phim cần tìm để cày chung..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-2.5 text-sm text-white focus:outline-none focus:border-red-600 transition-colors placeholder:text-zinc-600"
+                  />
+                  {isSearching && <span className="absolute right-3 bottom-3 text-xs text-zinc-500 animate-pulse">Đang tìm...</span>}
+
+                  {searchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-2 max-h-64 overflow-y-auto bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl z-50 p-2 flex flex-col gap-1 backdrop-blur-md custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-1">Gợi ý phim</p>
+                      
+                      {searchResults.map((movie: any) => {
+                        const rawImg = movie.thumb_url || movie.poster_url || "";
+                        const imgUrl = rawImg.startsWith('http') 
+                          ? rawImg 
+                          : rawImg 
+                            ? `https://img.ophim.live/uploads/movies/${rawImg}`
+                            : "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png";
+
+                        return (
+                          <div 
+                            key={movie._id || movie.slug}
+                            onClick={() => {
+                              setSelectedMovie({
+                                id: movie._id,
+                                slug: movie.slug,
+                                title: movie.name, 
+                                origin_name: movie.origin_name,
+                                year: movie.year,
+                                episode_current: movie.episode_current,
+                                thumb_url: rawImg
+                              });
+                              setSearchResults([]);
+                              setSearchQuery("");
+                            }}
+                            className="flex items-center gap-3 p-2 hover:bg-zinc-900 rounded-md cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0 group text-left"
+                          >
+                            <img 
+                              src={imgUrl} 
+                              alt={movie.name} 
+                              className="w-8 aspect-[2/3] rounded object-cover flex-shrink-0 border border-zinc-800/80 group-hover:scale-105 transition-transform duration-200" 
+                              loading="lazy"
+                            />
+
+                            <div className="flex flex-col truncate flex-1 min-w-0">
+                              <span className="text-xs font-semibold text-white truncate group-hover:text-red-500 transition-colors">
+                                {movie.name}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 mt-0.5 truncate">
+                                {movie.origin_name}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 mt-1 font-medium">
+                                {movie.year} | {movie.episode_current || "Full"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2.5 mt-8 border-t border-zinc-800/60 pt-4">
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setSelectedMovie(null);
+                  setSearchQuery("");
+                }}
+                className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button 
+                type="submit" 
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded-md text-xs transition-colors cursor-pointer shadow-md active:scale-95"
+              >
+                Khởi Tạo Phòng
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -40,6 +40,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
     { name: "Movies", href: "/movies" },
     { name: "TV Shows", href: "/tv-shows" },
     { name: "My List", href: "/my-list" },
+    { name: "Watch Party", href: "/watch-party" },
   ];
 
   useEffect(() => {

@@ -3,15 +3,17 @@
 import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { movieService } from "@/services/movie.service";
+import { socket } from "@/services/socket.service";
 
 type Props = {
   movie: Movie | null;
   onClose: () => void;
+  initialTime?: number;
 };
 
-export default function MovieModal({ movie, onClose }: Props) {
+export default function MovieModal({ movie, onClose, initialTime = 0 }: Props) {
   const [streamUrl, setStreamUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
@@ -20,9 +22,36 @@ export default function MovieModal({ movie, onClose }: Props) {
   const [activeEpisode, setActiveEpisode] = useState("");
   const [activeEpisodeName, setActiveEpisodeName] = useState("");
   const [isInMyList, setIsInMyList] = useState(false);
-
-  // DÙNG STATE NÀY ĐỂ QUẢN LÝ ẨN NÚT X KHI PHÓNG TO
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+  
+  // State lưu trữ dữ liệu chi tiết đầy đủ phục vụ bốc ảnh/thông tin cho lịch sử xem cá nhân
+  const [fullMovieDetail, setFullMovieDetail] = useState<any>(null);
+
+  const latestTimeRef = useRef<number>(0);
+  const isPlayingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentRoomId = urlParams.get("room");
+    if (!currentRoomId) return;
+
+    const handleRequestCurrentTimeFromHost = ({ targetSocketId }: { targetSocketId: string }) => {
+      const currentHostTime = latestTimeRef.current;
+      const currentPlayingStatus = isPlayingRef.current;
+
+      socket.emit("host_submitted_time_for_newbie", {
+        roomId: currentRoomId,
+        targetSocketId,
+        currentTime: currentHostTime,
+        isPlaying: currentPlayingStatus
+      });
+    };
+
+    socket.on("request_current_time_from_host", handleRequestCurrentTimeFromHost);
+    return () => {
+      socket.off("request_current_time_from_host", handleRequestCurrentTimeFromHost);
+    };
+  }, []);
 
   useEffect(() => {
     if (!movie) return;
@@ -66,6 +95,10 @@ export default function MovieModal({ movie, onClose }: Props) {
       try {
         const data = await movieService.getMovieDetail(movie.slug);
         if (data && data.episodes) {
+          if (data.movie) {
+            setFullMovieDetail(data.movie);
+          }
+
           setEpisodeData(data.episodes);
           const firstServer = data.episodes[0];
           setActiveServer(firstServer.server_name);
@@ -119,19 +152,42 @@ export default function MovieModal({ movie, onClose }: Props) {
   }, [onClose]);
 
   const handleProgress = (currentTime: number) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isWatchParty = urlParams.has("room");
+
+    latestTimeRef.current = currentTime;
+    isPlayingRef.current = true; 
+
+    if (isWatchParty) return;
     if (!movie || !activeEpisode) return;
 
     try {
       const historyData = localStorage.getItem("myflix_history");
       let history = historyData ? JSON.parse(historyData) : [];
 
+      // Ưu tiên bốc trường dữ liệu xịn từ API OPhim, sơ cua bằng movie thô của cha truyền vào
+      const source = fullMovieDetail || movie;
+
       const currentWatch = {
         watchId: `${movie.id}-${activeEpisode}`,
-        movie: movie,
         episodeSlug: activeEpisode,
         episodeName: activeEpisodeName,
         currentTime: currentTime,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        movie: {
+          id: movie.id,
+          slug: movie.slug,
+          title: movie.title,
+          description: source.description || movie.description || "",
+          // Bốc chuẩn key ảnh của OPhim (thumb_url/poster_url) chặn triệt để lỗi trắng hình card Xem Tiếp
+          poster: source.thumb_url || source.poster || movie.poster || "",
+          banner: source.poster_url || source.banner || movie.banner || "",
+          year: source.year || movie.year || 0,
+          duration: source.duration || movie.duration || "0", 
+          country: source.country || movie.country || "",
+          genre: source.genre || movie.genre || "",
+          episode_current: activeEpisodeName ? `Tập ${activeEpisodeName}` : movie.episode_current
+        }
       };
 
       history = history.filter((h: any) => h.watchId !== currentWatch.watchId);
@@ -166,7 +222,28 @@ export default function MovieModal({ movie, onClose }: Props) {
   const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
   const hasNextEpisode = episodes.length > 1 && currentIdx !== -1 && currentIdx < episodes.length - 1;
 
-  if (!movie) return null;
+  if (!movie) {
+    const isRoom = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("room");
+
+    if (isRoom) {
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm select-none"
+        >
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin mx-auto" />
+            <p className="text-sm font-bold text-zinc-400 tracking-wide animate-pulse">
+              📡 Đang kết nối hạ tầng và đồng bộ phòng xem chung...
+            </p>
+          </div>
+        </motion.div>
+      );
+    }
+
+    return null;
+  }
 
   return (
     <motion.div
@@ -181,7 +258,6 @@ export default function MovieModal({ movie, onClose }: Props) {
         animate={{ scale: 1, opacity: 1 }}
         className="bg-zinc-950 rounded-xl overflow-hidden w-full max-w-5xl max-h-[95vh] flex flex-col relative border border-zinc-800 shadow-2xl"
       >
-
         {!isPlayerFullscreen && (
           <button 
             onClick={(e) => {
@@ -209,7 +285,7 @@ export default function MovieModal({ movie, onClose }: Props) {
                onProgress={handleProgress}
                isSeries={hasNextEpisode} 
                onNext={handleNextEpisode} 
-               /* ĐỒNG BỘ NGƯỢC STATE FULLSCREEN LÊN MODAL MẸ */
+               initialTime={initialTime}
                onFullscreenChange={(isFullscreenNow) => setIsPlayerFullscreen(isFullscreenNow)}
             />
           ) : (
@@ -235,7 +311,6 @@ export default function MovieModal({ movie, onClose }: Props) {
                 <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
               </div>
 
-              {/* CHÈN ĐÚNG THANH CHỌN SERVER Ở ĐÂY */}
               {episodeData.length > 1 && (
                 <div className="flex gap-2 mb-6">
                   {episodeData.map((server) => (

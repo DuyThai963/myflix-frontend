@@ -6,6 +6,7 @@
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#e50914",
+  "scope": "/",
   "icons": [
     {
       "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png",
@@ -13,9 +14,17 @@
       "type": "image/png"
     },
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png",
+     "src": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png",
       "sizes": "512x512",
       "type": "image/png"
+    }
+  ],
+  "url_handlers": [
+    {
+      "origin": "http://localhost:3000"
+    },
+    {
+      "origin": "https://dt-myflix.vercel.app"
     }
   ]
 }
