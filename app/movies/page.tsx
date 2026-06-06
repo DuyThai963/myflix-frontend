@@ -20,7 +20,7 @@ export default function MoviesPage() {
     setLoading(true);
     try {
       // Ở đây ta gọi API danh-sach/phim-le vì đây là trang Movies
-      const response = await fetch(`http://localhost:5000/api/danh-sach/phim-le?page=${pageNum}`);
+      const response = await fetch(`https://dtmyflix.onrender.com/api/danh-sach/phim-le?page=${pageNum}`);
       const data = await response.json();
       
       if (data?.data?.items && data.data.items.length > 0) {

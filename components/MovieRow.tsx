@@ -21,7 +21,6 @@ export default function MovieRow({
 
   const scroll = (direction: "left" | "right") => {
     if (!rowRef.current) return;
-    // Chỉnh khoảng cách cuộn ngắn lại cho phù hợp với card dọc
     rowRef.current.scrollBy({
       left: direction === "left" ? -500 : 500,
       behavior: "smooth",
@@ -53,18 +52,22 @@ export default function MovieRow({
         className="flex gap-4 overflow-x-auto scroll-smooth pb-10 pt-4"
         style={{ scrollbarWidth: "none" }}
       >
-        {movies.map((movie) => (
-             <div 
-                key={movie.id} 
-                className="flex-none w-[160px] sm:w-[180px] md:w-[200px] lg:w-[220px]" 
-              >
-            <MovieCard
-              movie={movie}
-              onClick={() => onSelectMovie(movie)}
-              onRemove={onRemoveMovie ? () => onRemoveMovie(movie.id) : undefined}
-            />
-          </div>
-        ))}
+        {movies.map((movie, index) => {
+          const uniqueKey = (movie as any).watchId_db || movie.id || movie.slug || `row-item-${index}`;
+
+          return (
+            <div 
+              key={uniqueKey} 
+              className="flex-none w-[160px] sm:w-[180px] md:w-[200px] lg:w-[220px]" 
+            >
+              <MovieCard
+                movie={movie}
+                onClick={() => onSelectMovie(movie)}
+                onRemove={onRemoveMovie ? () => onRemoveMovie(movie.id) : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
     </section>
   );
