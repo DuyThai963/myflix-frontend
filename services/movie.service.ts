@@ -1,5 +1,4 @@
-// 1. Thay link localhost bằng link Render của bạn
-const BASE_URL = "https://dtmyflix.onrender.com/api";
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : "http://localhost:5000/api";
 
 const getImageUrl = (path: string) => {
   if (!path) return "https://placehold.co/600x400/18181b/ffffff?text=No+Image";

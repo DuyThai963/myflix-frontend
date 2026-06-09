@@ -116,7 +116,8 @@ export function useHomeLogic() {
         if (token && userString) {
           const user = JSON.parse(userString);
 
-          const res = await fetch(`https://dtmyflix.onrender.com/api/history/${user.id}`);
+          const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+          const res = await fetch(`${BACKEND_URL}/api/history/${user.id}`);
           
           if (res.ok) {
             const dbData = await res.json();
@@ -202,7 +203,7 @@ export function useHomeLogic() {
     if (token && userString) {
       const user = JSON.parse(userString);
       try {
-        const res = await fetch(`https://dtmyflix.onrender.com/api/history/delete?userId=${user.id}&watchId=${targetId}`, { 
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/delete?userId=${user.id}&watchId=${targetId}`, { 
           method: "DELETE" 
         });
         if (res.ok) {

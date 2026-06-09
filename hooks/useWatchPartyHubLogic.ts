@@ -67,7 +67,7 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
       }
       setIsSearching(true);
       try {
-        const response = await fetch(`https://dtmyflix.onrender.com/api/search?keyword=${encodeURIComponent(searchQuery)}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(searchQuery)}`);
         const resData = await response.json();
         
         if (resData?.status === "success" && resData?.data?.items) {

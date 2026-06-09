@@ -94,7 +94,7 @@ export function useVideoPlayerLogic({
     if (token && userString) {
       const user = JSON.parse(userString);
       try {
-        const res = await fetch("https://dtmyflix.onrender.com/api/history/sync", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/sync`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user.id, localHistory: [historyItem] })
@@ -282,7 +282,7 @@ export function useVideoPlayerLogic({
 
       if (token && userString) {
         const user = JSON.parse(userString);
-        const url = "https://dtmyflix.onrender.com/api/history/sync";
+        const url = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/sync`;
         const payload = JSON.stringify({ userId: user.id, localHistory: [historyItem] });
 
         if (navigator.sendBeacon) {

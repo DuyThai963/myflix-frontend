@@ -54,7 +54,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     setIsLoading(true);
     try {
       // 🚀 CHUYỂN HƯỚNG ENDPOINT LÊN SERVER PRODUCTION RENDER XỊN
-      const res = await fetch("https://dtmyflix.onrender.com/api/auth/login", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password: password.trim() })
@@ -74,7 +74,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
           try {
             const parsedHist = JSON.parse(localHist);
             if (parsedHist.length > 0) {
-              await fetch("https://dtmyflix.onrender.com/api/history/sync", {
+              await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/sync`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId: data.user.id, localHistory: parsedHist })
@@ -121,7 +121,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(`https://dtmyflix.onrender.com/api/search?keyword=${encodeURIComponent(keyword.trim())}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(keyword.trim())}`, {
           signal: controller.signal
         });
         const data = await response.json();

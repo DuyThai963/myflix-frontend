@@ -182,7 +182,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     if (token && userString) {
       try {
         const user = JSON.parse(userString);
-        await fetch("https://dtmyflix.onrender.com/api/history/sync", {
+        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/sync`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user.id, localHistory: [currentWatch] })
