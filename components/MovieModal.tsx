@@ -27,7 +27,8 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
     hasNextEpisode,
     toggleMyList,
     handleProgress,
-    handleNextEpisode
+    handleNextEpisode,
+    latestTimeRef
   } = useMovieModalLogic(movie, onClose);
 
   if (!movie) {
@@ -127,12 +128,24 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                     <button 
                       key={server.server_name} 
                       onClick={() => {
+                        // 🎯 1. Lưu cứng lại thời gian hiện tại trước khi đổi server
+                        if (movie && latestTimeRef.current > 0) {
+                          movie.currentTime = latestTimeRef.current;
+                        }
+
                         setActiveServer(server.server_name);
                         setEpisodes(server.server_data);
-                        const ep = server.server_data[0];
-                        setStreamUrl(ep.link_m3u8 || ep.link_embed);
-                        setActiveEpisode(ep.slug);
-                        setActiveEpisodeName(formatEpName(ep.name));
+                        
+                        // 🎯 2. Ánh xạ tìm lại tập tương ứng ở server mới
+                        let targetEp = server.server_data.find((ep: any) => ep.slug === activeEpisode);
+                        if (!targetEp) {
+                          targetEp = server.server_data[0]; // Rớt lại tập 1 nếu nguồn này không tồn tại tập bạn đang xem
+                          if (movie) movie.currentTime = 0; // Lệch số tập thì ép Player khởi động lại ở 0s
+                        }
+
+                        setStreamUrl(targetEp.link_m3u8 || targetEp.link_embed);
+                        setActiveEpisode(targetEp.slug);
+                        setActiveEpisodeName(formatEpName(targetEp.name));
                       }} 
                       className={`px-3 py-1 text-xs font-bold uppercase rounded border transition ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
                     >

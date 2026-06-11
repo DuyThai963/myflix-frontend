@@ -296,6 +296,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     hasNextEpisode,
     toggleMyList,
     handleProgress,
-    handleNextEpisode
+    handleNextEpisode,
+    latestTimeRef
   };
 }

@@ -411,42 +411,44 @@ export function useVideoPlayerLogic({
     setDuration(0);
     
     const video = videoRef.current;
-    let savedTime = 0; // Mặc định tập mới tinh chạy từ 0s
+    let savedTime = initialTime > 0 ? initialTime : 0; // 🎯 Ưu tiên số giây do Modal tiêm vào (Khi đổi Server)
     
     const token = localStorage.getItem("myflix_token");
     
-    if (token) {
-      // 🎯 LUỒNG ĐÃ ĐĂNG NHẬP: ĐỐI CHIẾU THẲNG MÃ TẬP ĐANG PHÁT VỚI MÃ TẬP LƯU TRONG DB
-      if (movieData) {
-        const dbWatchId = movieData.watchId_db || (movieData as any).watchid || "";
+    if (savedTime === 0) {
+      if (token) {
+        // 🎯 LUỒNG ĐÃ ĐĂNG NHẬP: ĐỐI CHIẾU THẲNG MÃ TẬP ĐANG PHÁT VỚI MÃ TẬP LƯU TRONG DB
+        if (movieData) {
+          const dbWatchId = movieData.watchId_db || (movieData as any).watchid || "";
 
-        if (String(dbWatchId) === String(movieId) && typeof movieData.currentTime === "number") {
-          savedTime = movieData.currentTime;
-        } else {
-          // Bổ sung: Tìm trong sessionStorage nếu click từ Trending
-          try {
-            const dbHist = sessionStorage.getItem("myflix_db_history");
-            if (dbHist) {
-              const histArr = JSON.parse(dbHist);
-              const found = histArr.find((h: any) => String(h.watchId) === String(movieId));
-              if (found && typeof found.currentTime === "number") {
-                savedTime = found.currentTime;
+          if (String(dbWatchId) === String(movieId) && typeof movieData.currentTime === "number") {
+            savedTime = movieData.currentTime;
+          } else {
+            // Bổ sung: Tìm trong sessionStorage nếu click từ Trending
+            try {
+              const dbHist = sessionStorage.getItem("myflix_db_history");
+              if (dbHist) {
+                const histArr = JSON.parse(dbHist);
+                const found = histArr.find((h: any) => String(h.watchId) === String(movieId));
+                if (found && typeof found.currentTime === "number") {
+                  savedTime = found.currentTime;
+                }
               }
-            }
-          } catch(e) {}
-        }
-      }
-    } else {
-      // LUỒNG GUEST CHƯA LOGIN: Đối chiếu trực tiếp mã tập với két Local Storage
-      try {
-        const historyData = localStorage.getItem("myflix_history");
-        if (historyData) {
-          const found = JSON.parse(historyData).find((h: any) => String(h.watchId) === String(movieId));
-          if (found && typeof found.currentTime === "number") {
-            savedTime = found.currentTime;
+            } catch(e) {}
           }
         }
-      } catch(e) {}
+      } else {
+        // LUỒNG GUEST CHƯA LOGIN: Đối chiếu trực tiếp mã tập với két Local Storage
+        try {
+          const historyData = localStorage.getItem("myflix_history");
+          if (historyData) {
+            const found = JSON.parse(historyData).find((h: any) => String(h.watchId) === String(movieId));
+            if (found && typeof found.currentTime === "number") {
+              savedTime = found.currentTime;
+            }
+          }
+        } catch(e) {}
+      }
     }
 
     video.currentTime = savedTime; 
