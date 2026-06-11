@@ -5,6 +5,12 @@ import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
 import { socket } from "@/services/socket.service";
 
+// 🛠️ HÀM HELPER: CHUẨN HÓA TÊN TẬP PHIM
+export const formatEpName = (name: string) => {
+  if (!name) return "";
+  return /^\d+$/.test(name.trim()) ? `Tập ${name.trim()}` : name.trim();
+};
+
 export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
   const [streamUrl, setStreamUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,6 +25,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
 
   const latestTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
+  const hasInitRef = useRef<string | null>(null); // 🛡️ Cờ chống spam API 2 lần do StrictMode
 
   // 📡 1. ĐỒNG BỘ MỐC THỜI GIAN CHO KHÁCH (LUỒNG WATCH PARTY HOST)
   useEffect(() => {
@@ -101,36 +108,88 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
           setEpisodes(serverData);
 
           if (serverData.length > 0) {
-            let startEpisode = serverData[0];
-            const token = localStorage.getItem("myflix_token");
+            let startEpisode = serverData[0]; // Tập đầu tiên mặc định
 
-            // Nhánh Đã Login
-            if (token && movie.episode_current) {
-              const targetEpNumber = movie.episode_current.replace(/\D/g, "");
-              const foundEp = serverData.find((ep: any) => ep.name.replace(/\D/g, "") === targetEpNumber);
-              if (foundEp) startEpisode = foundEp;
-            } 
-            // Nhánh Chưa Login
-            else {
-              try {
-                const historyData = localStorage.getItem("myflix_history");
-                if (historyData) {
-                  const history = JSON.parse(historyData);
-                  const movieHistory = history.find((h: any) => String(h.movie.id) === String(movie.id));
-                  if (movieHistory) {
-                    const targetSlug = movieHistory.episodeSlug || movieHistory.episodeslug;
-                    const foundEp = serverData.find((ep: any) => ep.slug === targetSlug);
-                    if (foundEp) startEpisode = foundEp;
-                  }
+            // 🎯 1. LỤC SOÁT LỊCH SỬ XEM DỞ TỪ LOCAL & SESSION STORAGE (USER/GUEST)
+            let foundHistorySlug: string | null = null;
+            try {
+              // Check Guest
+              const localHist = localStorage.getItem("myflix_history");
+              if (localHist) {
+                const histArr = JSON.parse(localHist);
+                const found = histArr.find((h: any) => String(h.movie?.id || h.watchId).startsWith(String(movie.id)));
+                if (found) foundHistorySlug = found.episodeSlug || found.episodeslug;
+              }
+              // Check User Logged In
+              if (!foundHistorySlug) {
+                const dbHist = sessionStorage.getItem("myflix_db_history");
+                if (dbHist) {
+                  const histArr = JSON.parse(dbHist);
+                  const found = histArr.find((h: any) => String(h.watchId).startsWith(String(movie.id)));
+                  if (found) foundHistorySlug = found.episodeSlug || found.episodeslug;
                 }
-              } catch (e) {}
+              }
+            } catch (e) {}
+
+            // 🎯 2. QUYẾT ĐỊNH TẬP NÀO ĐƯỢC CHỌN ĐỂ PHÁT
+            let chosenEp = null;
+
+            if (movie.watchId_db) {
+              const parts = String(movie.watchId_db).split('-');
+              if (parts.length > 1) {
+                const targetSlug = parts.slice(1).join('-');
+                chosenEp = serverData.find((ep: any) => String(ep.slug) === String(targetSlug));
+              }
             }
+            
+            if (!chosenEp && foundHistorySlug) {
+              chosenEp = serverData.find((ep: any) => String(ep.slug) === String(foundHistorySlug));
+            }
+
+            if (chosenEp) {
+              startEpisode = chosenEp;
+            }
+            // Nhánh C: Phim hoàn toàn mới -> Giữ nguyên startEpisode = serverData[0]
 
             const targetUrl = startEpisode.link_m3u8 || startEpisode.link_embed;
             if (targetUrl?.trim()) {
               setStreamUrl(targetUrl);
               setActiveEpisode(startEpisode.slug);
-              setActiveEpisodeName(startEpisode.name);
+              setActiveEpisodeName(formatEpName(startEpisode.name));
+            }
+
+            // --- KHỞI TẠO KHUNG PHIM TĨNH (THỜI ĐIỂM 1) ---
+            if (!data.item || !data.item.name) {
+              console.warn("⚠️ Chặn Init History: Thiếu dữ liệu phim gốc data.item hoặc data.item.name");
+            } else {
+              try {
+                const token = localStorage.getItem("myflix_token");
+                const userString = localStorage.getItem("myflix_user");
+                if (token && userString) {
+                  const user = JSON.parse(userString);
+                  
+                  // 🛡️ CHỐT CHẶN: Chỉ gọi API nếu chưa init cho ID phim này
+                  if (hasInitRef.current !== String(movie.id)) {
+                    hasInitRef.current = String(movie.id);
+                    
+                    const payload = {
+                      userId: user.id,
+                      movieId: movie.id,
+                      episodeSlug: startEpisode.slug,
+                      episodeName: formatEpName(startEpisode.name),
+                      currentTime: 0,
+                      movie: { ...data.item, title: data.item.name }
+                    };
+                    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/init`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload)
+                    }).catch(err => console.error("Lỗi gọi INIT API:", err));
+                  }
+                }
+              } catch (e) {
+                console.error("Lỗi parse user data", e);
+              }
             }
           }
         }
@@ -154,6 +213,14 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     if (isWatchPartyActive) return; 
     if (!movie || !activeEpisode) return;
 
+    const token = localStorage.getItem("myflix_token");
+    const userString = localStorage.getItem("myflix_user");
+
+    // 🛡️ CHỐT CHẶN: Đã đăng nhập thì RETURN luôn, cấm gọi API liên tục mỗi giây để chống spam DB!
+    if (token && userString) {
+      return; 
+    }
+
     const source = fullMovieDetail || movie;
     const currentWatch = {
       watchId: `${movie.id}-${activeEpisode}`,
@@ -172,26 +239,9 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
         duration: source.duration || movie.duration || "0",
         country: source.country || movie.country || "",
         genre: source.genre || movie.genre || "",
-        episode_current: activeEpisodeName ? `Tập ${activeEpisodeName}` : movie.episode_current
+        episode_current: movie.episode_current // 🛡️ Giữ nguyên mốc "Hoàn tất / Tập mới nhất" gốc của phim
       }
     };
-
-    const token = localStorage.getItem("myflix_token");
-    const userString = localStorage.getItem("myflix_user");
-
-    if (token && userString) {
-      try {
-        const user = JSON.parse(userString);
-        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, localHistory: [currentWatch] })
-        });
-      } catch (err) {
-        console.error("❌ Lỗi đồng bộ real-time lên server:", err);
-      }
-      return; 
-    }
 
     try {
       const historyData = localStorage.getItem("myflix_history");
@@ -218,14 +268,13 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
 
       if (nextUrl?.trim()) {
         if (movie) {
-          movie.episode_current = `Tập ${nextEp.name}`;
           movie.watchId_db = `${movie.id}-${nextEp.slug}`;
           movie.currentTime = 0; // 🔥 ÉP CHẾT REFERENCE OBJECT VỀ CHỮA CHÁY TIME 0S TỨC THÌ
         }
 
         setStreamUrl(nextUrl);
         setActiveEpisode(nextEp.slug);
-        setActiveEpisodeName(nextEp.name);
+        setActiveEpisodeName(formatEpName(nextEp.name));
       }
     }
   };

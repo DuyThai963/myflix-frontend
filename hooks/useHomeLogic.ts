@@ -123,31 +123,39 @@ export function useHomeLogic() {
             const dbData = await res.json();
             
             if (!dbData || dbData.length === 0) {
+              sessionStorage.removeItem("myflix_db_history");
               setContinueWatching([]);
               return;
             }
+
+            // 👉 LƯU VÀO SESSION STORAGE ĐỂ MODAL ĐỌC ĐƯỢC KHI CLICK TỪ TRENDING
+            sessionStorage.setItem("myflix_db_history", JSON.stringify(dbData));
 
             // 🚀 GIỮ NGUYÊN LOGIC DÙNG MAP LỌC TRÙNG CŨ CỦA ÔNG
             const uniqueMoviesMap = new Map();
             dbData.forEach((item: any) => {
               const movieObj = item.movie ? { ...item.movie } : null; 
               if (movieObj && movieObj.id && !uniqueMoviesMap.has(movieObj.id)) {
-                // 🎯 CHỈ THÊM CÁC DÒNG ĐỒNG BỘ ĐỂ KHÔNG MẤT DỮ LIỆU:
-                movieObj.episode_current = item.episodeName || movieObj.episode_current;
-                movieObj.watchId_db = item.watchId || item.watch_id;
+                
+                // 🎯 TÁI TẠO LẠI watchId_db CHỨA SỐ TẬP ĐỂ MODAL BIẾT ĐƯỜNG MỞ ĐÚNG TẬP XEM DỞ
+                const baseId = item.watchId || item.watch_id;
+                const epSlug = item.episodeSlug || item.episode_slug;
+                movieObj.watchId_db = (epSlug && epSlug !== "full") ? `${baseId}-${epSlug}` : baseId;
                 
                 // Lấy watched_time từ DB map ngược vào biến currentTime cho Modal đọc
                 movieObj.currentTime = item.currentTime || item.watched_time; 
 
-                // Đồng bộ trường ảnh để né lỗi "No Image" ngoài trang chủ
-                movieObj.poster_url = movieObj.poster_url || movieObj.poster;
+                // 🛡️ Đồng bộ tên phim và trường ảnh để né lỗi "No Image" ngoài trang chủ
+                movieObj.title = movieObj.title || movieObj.name;
+                movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
                 uniqueMoviesMap.set(movieObj.id, movieObj);
               }
             });
             
-            setContinueWatching(Array.from(uniqueMoviesMap.values()));
+            const finalHistoryList = Array.from(uniqueMoviesMap.values());
+            setContinueWatching(finalHistoryList);
             return;
           }
         } 
@@ -161,18 +169,21 @@ export function useHomeLogic() {
             parsedHistory.forEach((item: any) => {
               const movieObj = item.movie ? { ...item.movie } : null;
               if (movieObj && movieObj.id && !uniqueMoviesMap.has(movieObj.id)) {
-                movieObj.episode_current = item.episodeName || movieObj.episode_current;
-                movieObj.watchId_db = item.watchId; 
+                const baseId = item.watchId && item.watchId.includes("-") ? item.watchId.split("-")[0] : item.watchId;
+                const epSlug = item.episodeSlug;
+                movieObj.watchId_db = (epSlug && epSlug !== "full") ? `${baseId}-${epSlug}` : item.watchId;
                 movieObj.currentTime = item.currentTime;
 
-                // Đồng bộ ảnh cho luồng Guest
-                movieObj.poster_url = movieObj.poster_url || movieObj.poster;
+                // 🛡️ Đồng bộ tên phim và trường ảnh cho luồng Guest
+                movieObj.title = movieObj.title || movieObj.name;
+                movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
                 uniqueMoviesMap.set(movieObj.id, movieObj);
               }
             });
-            setContinueWatching(Array.from(uniqueMoviesMap.values()));
+            const finalHistoryList = Array.from(uniqueMoviesMap.values());
+            setContinueWatching(finalHistoryList);
           } else {
             setContinueWatching([]);
           }

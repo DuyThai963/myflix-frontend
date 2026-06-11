@@ -39,11 +39,13 @@ export function useVideoPlayerLogic({
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const leftRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rightRippleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [showLeftRipple, setShowLeftRipple] = useState(false);
   const [showRightRipple, setShowRightRipple] = useState(false);
   
   const hasSyncedInitialTimeRef = useRef<string>("");
+  const lastSavedTimeRef = useRef<number>(-1);
   const currentTimeRef = useRef(0);
   const isWatchPartyRef = useRef(isWatchParty);
   const prevMovieIdRef = useRef<string | null>(null);
@@ -65,12 +67,27 @@ export function useVideoPlayerLogic({
 
     const token = localStorage.getItem("myflix_token");
     const userString = localStorage.getItem("myflix_user");
-    const currentEpisodeSlug = isSeries ? movieId.toString().split('-').pop() || '1' : "full";
-    const currentEpisodeName = isSeries ? `Tập ${currentEpisodeSlug}` : "Full";
+    
+    // --- KHỐI NHẬN DIỆN THÔNG TIN TẬP PHIM SIÊU CHUẨN (FIXED: BÓC CHUẨN TỪ MOVIEID ĐANG PHÁT) ---
+    const originalEpCurrent = movieData?.episode_current || "";
     const cleanMovieId = String(movieId).split('-')[0];
+    
+    const isActuallySeries = isSeries || originalEpCurrent.toLowerCase().includes("tập") || (movieData?.type && movieData.type !== 'single');
+
+    let currentEpisodeSlug = "full";
+    if (String(movieId).includes('-')) {
+      currentEpisodeSlug = String(movieId).split('-').slice(1).join('-');
+    }
+
+    const currentEpisodeName = (isActuallySeries && currentEpisodeSlug !== "full") 
+      ? `Tập ${currentEpisodeSlug}` 
+      : (originalEpCurrent || "Full");
+
+    const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
+    // -----------------------------------------------------
 
     const historyItem = {
-      watchId: String(movieId), 
+      watchId: finalWatchId, 
       episodeSlug: currentEpisodeSlug,
       episodeName: currentEpisodeName,
       currentTime: isEnding ? 0 : Math.floor(timeToSave),
@@ -86,7 +103,7 @@ export function useVideoPlayerLogic({
         duration: movieData?.duration || "",
         country: movieData?.country || "",
         genre: movieData?.genre || "",
-        episode_current: currentEpisodeName
+        episode_current: originalEpCurrent // Giữ nguyên "Tập 16" cho Card ngoài Home hiển thị
       }
     };
 
@@ -125,13 +142,64 @@ export function useVideoPlayerLogic({
     }
   };
 
+  // 🛡️ HÀM BẮN API TIME-ONLY: SIÊU NHẸ (TIẾT KIỆM BĂNG THÔNG & DB)
+  const saveWatchingProgressTimeOnly = (timeToSave: number) => {
+    if (timeToSave <= 0) return;
+    if (isWatchPartyRef.current === true || isWatchParty === true) return;
+
+    // 🛡️ LỚP CHẮN 1: Chống spam kim giây (Tránh lưu liên tục nếu cách nhau < 2 giây)
+    if (Math.abs(timeToSave - lastSavedTimeRef.current) < 2) return;
+    lastSavedTimeRef.current = timeToSave;
+
+    const token = localStorage.getItem("myflix_token");
+    const userString = localStorage.getItem("myflix_user");
+    
+    const cleanMovieId = String(movieId).split('-')[0];
+    let currentEpisodeSlug = "full";
+    if (String(movieId).includes('-')) {
+      currentEpisodeSlug = String(movieId).split('-').slice(1).join('-');
+    }
+    const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
+
+    if (token && userString) {
+      const user = JSON.parse(userString);
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, movieId: finalWatchId, currentTime: Math.floor(timeToSave) }),
+        keepalive: true // 🛡️ Giữ request sống sót bay đi được kể cả khi trình duyệt đóng/unmount
+      }).catch(() => {});
+    } else {
+      // Fallback: Đồng bộ nhanh vào Local Storage cho Guest
+      try {
+        const localHist = localStorage.getItem("myflix_history");
+        if (localHist) {
+          let historyArray = JSON.parse(localHist);
+          const idx = historyArray.findIndex((item: any) => item.watchId === finalWatchId);
+          if (idx !== -1) {
+            historyArray[idx].currentTime = Math.floor(timeToSave);
+            historyArray[idx].updatedAt = new Date().toISOString();
+            localStorage.setItem("myflix_history", JSON.stringify(historyArray));
+          }
+        }
+      } catch(e) {}
+    }
+  };
+
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
-      saveWatchingProgress(videoRef.current.currentTime);
+      
+      // 🛡️ LỚP CHẮN 2: Debounce nút Pause (Đợi 1000ms mới kích hoạt lưu)
+      pauseTimeoutRef.current = setTimeout(() => {
+        if (videoRef.current) saveWatchingProgressTimeOnly(videoRef.current.currentTime);
+      }, 1000);
     } else {
+      // Nếu người dùng bấm Play lại trong vòng 1 giây -> Lập tức hủy lệnh lưu của nút Pause vừa rồi
+      if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
+      
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
       handleUserInteraction();
@@ -250,17 +318,33 @@ export function useVideoPlayerLogic({
   useEffect(() => {
     const handleSuddenClose = () => {
       const targetTime = currentTimeRef.current;
-      if (targetTime <= 0) return;
+      // 🛡️ Cho phép targetTime === 0 lọt qua để gửi lệnh dọn rác 0s xuống API /sync
+      if (targetTime < 0) return;
       if (isWatchPartyRef.current === true || isWatchParty === true) return;
 
       const token = localStorage.getItem("myflix_token");
       const userString = localStorage.getItem("myflix_user");
-      const currentEpisodeSlug = isSeries ? movieId.toString().split('-').pop() || '1' : "full";
-      const currentEpisodeName = isSeries ? `Tập ${currentEpisodeSlug}` : "Full";
+      
+      // --- KHỐI NHẬN DIỆN THÔNG TIN TẬP PHIM SIÊU CHUẨN (FIXED: BÓC CHUẨN TỪ MOVIEID ĐANG PHÁT) ---
+      const originalEpCurrent = movieData?.episode_current || "";
       const cleanMovieId = String(movieId).split('-')[0];
+      
+      const isActuallySeries = isSeries || originalEpCurrent.toLowerCase().includes("tập") || (movieData?.type && movieData.type !== 'single');
+
+      let currentEpisodeSlug = "full";
+      if (String(movieId).includes('-')) {
+        currentEpisodeSlug = String(movieId).split('-').slice(1).join('-');
+      }
+
+      const currentEpisodeName = (isActuallySeries && currentEpisodeSlug !== "full") 
+        ? `Tập ${currentEpisodeSlug}` 
+        : (originalEpCurrent || "Full");
+
+      const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
+      // -----------------------------------------------------
 
       const historyItem = {
-        watchId: String(movieId),
+        watchId: finalWatchId,
         episodeSlug: currentEpisodeSlug,
         episodeName: currentEpisodeName,
         currentTime: Math.floor(targetTime),
@@ -276,7 +360,7 @@ export function useVideoPlayerLogic({
           duration: movieData?.duration || "",
           country: movieData?.country || "",
           genre: movieData?.genre || "",
-          episode_current: currentEpisodeName
+          episode_current: originalEpCurrent // Giữ nguyên "Tập 16" cho Card ngoài Home hiển thị
         }
       };
 
@@ -300,7 +384,9 @@ export function useVideoPlayerLogic({
         const localHist = localStorage.getItem("myflix_history");
         let historyArray = localHist ? JSON.parse(localHist) : [];
         historyArray = historyArray.filter((item: any) => item.movie.id !== historyItem.movie.id);
-        historyArray.unshift(historyItem);
+        if (targetTime > 0) {
+          historyArray.unshift(historyItem);
+        }
         localStorage.setItem("myflix_history", JSON.stringify(historyArray.slice(0, 15)));
       } catch (e) {}
     };
@@ -314,7 +400,7 @@ export function useVideoPlayerLogic({
     };
   }, [movieId, movieTitle, isSeries, movieData, isWatchParty]);
 
-  // 🎯 TÌM ĐÚNG EFFECT KHỞI CHẠY HLS TRONG FILE hooks/useVideoPlayerLogic.ts
+  // 🎯 CORE HLS ENGINE KHỞI CHẠY & BẮT ĐÚNG SỐ GIÂY (PHÂN NHÁNH ĐỌC SẠCH NGUỒN DATA ĐẦU VÀO)
   useEffect(() => {
     if (!videoRef.current || !src) return;
 
@@ -337,7 +423,17 @@ export function useVideoPlayerLogic({
         if (String(dbWatchId) === String(movieId) && typeof movieData.currentTime === "number") {
           savedTime = movieData.currentTime;
         } else {
-          savedTime = 0;
+          // Bổ sung: Tìm trong sessionStorage nếu click từ Trending
+          try {
+            const dbHist = sessionStorage.getItem("myflix_db_history");
+            if (dbHist) {
+              const histArr = JSON.parse(dbHist);
+              const found = histArr.find((h: any) => String(h.watchId) === String(movieId));
+              if (found && typeof found.currentTime === "number") {
+                savedTime = found.currentTime;
+              }
+            }
+          } catch(e) {}
         }
       }
     } else {
@@ -346,10 +442,8 @@ export function useVideoPlayerLogic({
         const historyData = localStorage.getItem("myflix_history");
         if (historyData) {
           const found = JSON.parse(historyData).find((h: any) => String(h.watchId) === String(movieId));
-          if (found) {
+          if (found && typeof found.currentTime === "number") {
             savedTime = found.currentTime;
-          } else {
-            savedTime = 0;
           }
         }
       } catch(e) {}
@@ -366,7 +460,13 @@ export function useVideoPlayerLogic({
         video.play().catch(() => {});
         setLoading(false);
       }, { once: true });
-      return () => { video.removeAttribute('src'); }
+      return () => { 
+        if (video) {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
     } 
     else if (Hls.isSupported()) {
       const hls = new Hls();
@@ -384,66 +484,19 @@ export function useVideoPlayerLogic({
         }
       }, { once: true });
 
-      return () => hls.destroy();
+      return () => {
+        // 🛡️ DỌN DẸP PLAYER TRIỆT ĐỂ KHI UNMOUNT
+        if (hls) {
+          hls.destroy();
+        }
+        if (video) {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
     }
   }, [src, movieId, movieData]);
-
-  // CORE HLS ENGINE KHỞI CHẠY (PHÂN NHÁNH ĐỌC SẠCH NGUỒN DATA ĐẦU VÀO)
-  useEffect(() => {
-    if (!videoRef.current || !src) return;
-    setLoading(true); setShowNextButton(false); setShowSkipIntroButton(false);
-    setIsPlaying(true); 
-    
-    // 🌟 BƯỚC 1: ÉP LÀM SẠCH STATE THỜI GIAN TRÊN UI VỀ 0 NGAY KHI ĐỔI SRC
-    setCurrentTime(0); 
-    setDuration(0);
-    
-    const video = videoRef.current;
-    
-    // 🎯 QUAN TRỌNG: Mặc định tập mới phải chạy từ 0 vĩnh viễn, trừ khi tìm thấy lịch sử lưu dở của ĐÚNG TẬP ĐÓ!
-    let savedTime = 0; 
-    
-    const token = localStorage.getItem("myflix_token");
-    // Khi ở chế độ GUEST (Không có token)
-    if (!token) {
-      try {
-        const historyData = localStorage.getItem("myflix_history");
-        if (historyData) {
-          // 🌟 SỬA ĐOẠN NÀY: Phải đối chiếu chuẩn xác trúng ĐÚNG MÃ TẬP PHIM (watchId full có đuôi tập) 
-          // chứ không được đối chiếu theo ID phim trơn nữa, để tránh việc tập này bốc nhầm thời gian tập kia!
-          const found = JSON.parse(historyData).find((h: any) => String(h.watchId) === String(movieId));
-          if (found) {
-            savedTime = found.currentTime;
-          }
-        }
-      } catch(e) {}
-    }
-
-    // 🌟 BƯỚC 2: ÉP KIM THỜI GIAN THỰC CỦA THẺ VIDEO VỀ ĐÚNG KHUÔN KHỔ
-    video.currentTime = savedTime; 
-    currentTimeRef.current = savedTime; // Cập nhật luôn biến Ref hốt xác khẩn cấp
-
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-      video.addEventListener('loadedmetadata', () => {
-        setDuration(video.duration);
-        video.currentTime = savedTime; // Bảo hiểm nện lại phát nữa khi metadata nạp xong
-        video.play().catch(() => {});
-        setLoading(false);
-      }, { once: true });
-      return () => { video.removeAttribute('src'); }
-    } 
-    else if (Hls.isSupported()) {
-      const hls = new Hls();
-      hls.loadSource(src); hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setDuration(video.duration);
-        video.currentTime = savedTime; // Bảo hiểm nện lại cho luồng PC/Android
-        video.play().catch(() => {});
-      });
-      return () => hls.destroy();
-    }
-  }, [src, movieId]);
 
   // Luồng Polling Sync phòng xem chung
   useEffect(() => {
@@ -478,6 +531,7 @@ export function useVideoPlayerLogic({
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
       if (leftRippleTimeoutRef.current) clearTimeout(leftRippleTimeoutRef.current);
       if (rightRippleTimeoutRef.current) clearTimeout(rightRippleTimeoutRef.current);
+      if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
     };
   }, [isPlaying]);
 

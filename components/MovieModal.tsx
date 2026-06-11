@@ -3,7 +3,7 @@
 import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
-import { useMovieModalLogic } from "@/hooks/useMovieModalLogic";
+import { useMovieModalLogic, formatEpName } from "@/hooks/useMovieModalLogic";
 
 type Props = {
   movie: Movie | null;
@@ -132,7 +132,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                         const ep = server.server_data[0];
                         setStreamUrl(ep.link_m3u8 || ep.link_embed);
                         setActiveEpisode(ep.slug);
-                        setActiveEpisodeName(ep.name);
+                        setActiveEpisodeName(formatEpName(ep.name));
                       }} 
                       className={`px-3 py-1 text-xs font-bold uppercase rounded border transition ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
                     >
@@ -183,13 +183,13 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                         onClick={() => {
                           if (ep.link_m3u8 || ep.link_embed) {
                             if (movie) {
-                              movie.episode_current = `Tập ${ep.name}`;
+                              // ❌ KHÔNG GHI ĐÈ movie.episode_current Ở ĐÂY NỮA, BẢO TOÀN TRẠNG THÁI GỐC
                               movie.watchId_db = `${movie.id}-${ep.slug}`;
                               movie.currentTime = 0;
                             }
                             setStreamUrl(ep.link_m3u8 || ep.link_embed);
                             setActiveEpisode(ep.slug);
-                            setActiveEpisodeName(ep.name);
+                            setActiveEpisodeName(formatEpName(ep.name));
                           } else {
                             alert("Tập này không có link stream!");
                           }
@@ -201,7 +201,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white"
                         }`}
                       >
-                        Tập {ep.name}
+                        {formatEpName(ep.name)}
                       </button>
                     );
                   })}
