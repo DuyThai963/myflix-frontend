@@ -81,6 +81,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         bg-zinc-900
         group
         transform-gpu
+        backface-hidden
         
         /* CHUẨN TAILWIND HOVER: Chỉ tương tác khi dùng chuột ở PC/Máy chiếu */
         @media:pointer-fine:hover:scale-105 
@@ -91,7 +92,14 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         touch-pan-x touch-pan-y
         select-none
       "
-      style={{ touchAction: "pan-x pan-y" }} // Đồng bộ inline style để Safari không hiểu lầm
+      style={{ 
+        touchAction: "pan-x pan-y",
+        WebkitTransform: "translateZ(0)",
+        WebkitBackfaceVisibility: "hidden",
+        WebkitPerspective: "1000",
+        WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+        WebkitTouchCallout: "none"
+      }}
     >
       {tag && tag.text && (
         <div 

@@ -49,8 +49,8 @@ export default function MovieRow({
 
       <div
         ref={rowRef}
-        className="flex gap-4 overflow-x-auto scroll-smooth pb-10 pt-4"
-        style={{ scrollbarWidth: "none" }}
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-10 pt-4 overscroll-x-contain"
+        style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
       >
         {movies.map((movie, index) => {
           const uniqueKey = (movie as any).watchId_db || movie.id || movie.slug || `row-item-${index}`;

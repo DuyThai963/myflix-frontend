@@ -58,8 +58,8 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
       socket.emit("host_submitted_time_for_newbie", {
         roomId: currentRoomId,
         targetSocketId,
-        // 🎯 BÙ TRỪ LATENCY: Cộng thêm 1.5s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
-        currentTime: latestTimeRef.current + 1.5,
+        // 🎯 BÙ TRỪ LATENCY: Cộng thêm 32s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
+        currentTime: latestTimeRef.current + 32,
         isPlaying: isPlayingRef.current,
         episodeSlug: activeEpisodeRef.current,
         episodeName: activeEpisodeNameRef.current

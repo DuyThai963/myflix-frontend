@@ -25,6 +25,9 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
 
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinRoomId, setJoinRoomId] = useState("");
+
   useEffect(() => {
     setMounted(true);
     try {
@@ -44,6 +47,27 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
 
   if (!mounted) return null; // 🛡️ Tránh lỗi Hydration Mismatch giữa SSR và Client
 
+  // 🎯 HÀM XỬ LÝ VÀO PHÒNG BẰNG MÃ CODE (GIẢI PHÁP CHO PWA)
+  const handleJoinByCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinRoomId.trim()) return;
+    
+    const roomId = joinRoomId.trim();
+    const newUrl = `${window.location.pathname}?room=${roomId}`;
+    window.history.pushState({}, "", newUrl);
+
+    const userString = localStorage.getItem("myflix_user");
+    const user = userString ? JSON.parse(userString) : null;
+    const userName = user?.username || `ChiếnHữu_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const userId = user?.id || null;
+    
+    socket.emit("join_room", { roomId, userName, userId, hostToken: null });
+    onJoinRoomClick(roomId);
+    
+    setShowJoinModal(false);
+    setJoinRoomId("");
+  };
+
   return (
     <div className="p-4 md:p-12 bg-zinc-950 min-h-screen text-white mt-16 select-none animate-in fade-in duration-300">
       <div className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
@@ -51,19 +75,27 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
           <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent">Watch Party Hub</h1>
           <p className="text-zinc-400 text-xs md:text-sm mt-1.5">Nơi kết nối và xem phim thời gian thực cùng nhau</p>
         </div>
-        <button 
-          onClick={() => {
-            const token = localStorage.getItem("myflix_token");
-            if (!token) {
-              alert("⚠️ Vui lòng Đăng nhập tài khoản để có quyền Khởi tạo phòng xem chung!");
-              return;
-            }
-            setShowCreateModal(true);
-          }}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2.5 rounded-md text-sm transition-all shadow-lg shadow-red-900/20 active:scale-95 cursor-pointer"
-        >
-          Tạo Phòng Mới
-        </button>
+        <div className="flex items-center gap-2 md:gap-3">
+          <button 
+            onClick={() => setShowJoinModal(true)}
+            className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-3 py-2 md:px-5 md:py-2.5 rounded-md text-xs md:text-sm transition-all border border-zinc-700 active:scale-95 cursor-pointer"
+          >
+            Nhập Mã
+          </button>
+          <button 
+            onClick={() => {
+              const token = localStorage.getItem("myflix_token");
+              if (!token) {
+                alert("⚠️ Vui lòng Đăng nhập tài khoản để có quyền Khởi tạo phòng xem chung!");
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 md:px-5 md:py-2.5 rounded-md text-xs md:text-sm transition-all shadow-lg shadow-red-900/20 active:scale-95 cursor-pointer"
+          >
+            Tạo Phòng
+          </button>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto">
@@ -231,6 +263,33 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
               </button>
               <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded-md text-xs transition-colors cursor-pointer shadow-md active:scale-95">
                 Khởi Tạo Phòng
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL NHẬP MÃ PHÒNG (GIẢI PHÁP CHO PWA APP) */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200">
+          <form onSubmit={handleJoinByCodeSubmit} className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl w-full max-w-sm mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-bold mb-3 tracking-wide text-zinc-100">Nhập Mã Phòng</h2>
+            <p className="text-xs text-zinc-400 mb-5 leading-relaxed">Nếu bạn đang dùng App, hãy copy mã phòng và dán vào đây để xem chung thay vì click link web.</p>
+            
+            <div className="mb-6">
+              <input 
+                type="text" required value={joinRoomId} onChange={(e) => setJoinRoomId(e.target.value)}
+                placeholder="VD: wp_abc123..."
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-3 text-sm text-white focus:outline-none focus:border-red-600 transition-colors placeholder:text-zinc-600 font-mono tracking-wider"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 border-t border-zinc-800/60 pt-4">
+              <button type="button" onClick={() => { setShowJoinModal(false); setJoinRoomId(""); }} className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                Hủy
+              </button>
+              <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded-md text-xs transition-colors cursor-pointer shadow-md active:scale-95">
+                Vào Phòng
               </button>
             </div>
           </form>

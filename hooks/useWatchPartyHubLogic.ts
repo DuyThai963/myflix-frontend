@@ -130,8 +130,8 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
   const handleShareRoom = (roomId: string, roomName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const shareLink = `${window.location.origin}/watch-party?room=${roomId}`;
-    navigator.clipboard.writeText(shareLink);
-    alert(`🔗 Đã copy link phòng [${roomName}]!\nHãy gửi link này cho bạn bè để cùng vào cày phim nhé:\n${shareLink}`);
+    navigator.clipboard.writeText(`🎬 Phim: ${roomName}\n🔗 Link Web: ${shareLink}\n\n🔑 MÃ PHÒNG (Dành cho App): ${roomId}`);
+    alert(`🔗 Đã copy thông tin phòng [${roomName}]!\n\nCách 1: Gửi Link Web cho bạn bè.\nCách 2 (Tốt nhất cho PWA App): Gửi MÃ PHÒNG [ ${roomId} ] để họ nhập trực tiếp trong App!`);
   };
 
   // 🗑️ 4. HÀM PHÁT LỆNH XÓA PHÒNG PHÍA HOST (DỰA 100% VÀO ID NGƯỜI DÙNG)

@@ -22,7 +22,8 @@ export default function LoadingIntro({ isLoading }: { isLoading: boolean }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-transparent overflow-hidden pointer-events-none"
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-transparent overflow-hidden overscroll-none touch-none select-none ${isLoading ? "pointer-events-auto" : "pointer-events-none"}`}
+      style={{ WebkitTouchCallout: "none" }}
       // Thay vì dùng exit, ta dùng thẳng animate để fade out khi isLoading = false
       animate={{ opacity: isLoading ? 1 : 0 }}
       transition={{ duration: 0.5, delay: 1.5 }}

@@ -63,7 +63,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm select-none"
+      className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm select-none overscroll-none"
     >
       <motion.div
         onClick={(e) => e.stopPropagation()}
@@ -113,7 +113,10 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
         </div>
 
         {/* Khối hiển thị thông tin chi tiết phim */}
-        <div className="p-6 md:p-8 overflow-y-auto z-0 flex-1">
+        <div 
+          className="p-6 md:p-8 overflow-y-auto z-0 flex-1 overscroll-contain"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="flex-1">
               <h1 className="text-2xl md:text-4xl font-bold mb-3 text-white leading-tight">
@@ -192,7 +195,10 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                 <h3 className="text-xs font-bold mb-4 text-zinc-500 uppercase tracking-widest">
                   Danh sách tập ({episodes.length})
                 </h3>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                <div 
+                  className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar overscroll-contain"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
                   {episodes.map((ep, idx) => {
                     const isPlayable = ep.link_m3u8 && ep.link_m3u8.trim() !== "";
                     return (
