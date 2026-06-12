@@ -7,6 +7,8 @@ import { Movie } from "@/types/movie";
 interface Room {
   roomId: string;
   roomName: string;
+  hostUserId?: string | number;
+  hostUsername?: string;
   movieState: {
     slug: string;
     title: string;
@@ -14,6 +16,7 @@ interface Room {
     currentTime: number;
   };
   users: any[];
+  joinedUserIds?: (string | number)[]; // Thêm mảng này để nhận list user_id được share từ Backend
 }
 
 export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void) {
@@ -31,18 +34,20 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
       socket.connect();
     }
     
-    socket.emit("get_active_rooms");
+    // Bắn lệnh xin phòng ĐÚNG THỜI ĐIỂM KẾT NỐI XONG
+    if (socket.connected) {
+      socket.emit("get_active_rooms");
+    }
+    socket.on("connect", () => {
+      socket.emit("get_active_rooms");
+    });
 
     socket.on("active_rooms_list", (data: Room[]) => {
       setRooms(data);
     });
 
-    // 🚀 LUỒNG TẠO PHÒNG THÀNH CÔNG: Chuyển sạch sang găm vào sessionStorage để tự hủy khi tắt tab!
-    socket.on("room_created_success", ({ roomId, hostToken }) => {
-      try {
-        sessionStorage.setItem(`myflix_host_of_${roomId}`, "true");
-        sessionStorage.setItem(`host_token_${roomId}`, hostToken);
-      } catch (e) {}
+    // 🚀 LUỒNG TẠO PHÒNG THÀNH CÔNG
+    socket.on("room_created_success", ({ roomId }) => {
       
       const newUrl = `${window.location.pathname}?room=${roomId}`;
       window.history.pushState({}, "", newUrl);
@@ -53,6 +58,7 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
     });
 
     return () => {
+      socket.off("connect");
       socket.off("active_rooms_list");
       socket.off("room_created_success");
     };
@@ -104,9 +110,11 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
     socket.emit("create_room", {
       roomName: roomName.trim(),
       movieInfo: {
+        id: selectedMovie.id,
         slug: selectedMovie.slug,
         title: selectedMovie.title,
         episode: "Tập 1", 
+        episodeSlug: "full",
         currentTime: 0    
       },
       hostUserId: user.id,
@@ -126,20 +134,20 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
     alert(`🔗 Đã copy link phòng [${roomName}]!\nHãy gửi link này cho bạn bè để cùng vào cày phim nhé:\n${shareLink}`);
   };
 
-  // 🗑️ 4. HÀM PHÁT LỆNH XÓA PHÒNG PHÍA HOST (ĐÃ ĐỒNG BỘ SẠCH RÁC SANG SESSIONSTORAGE)
+  // 🗑️ 4. HÀM PHÁT LỆNH XÓA PHÒNG PHÍA HOST (DỰA 100% VÀO ID NGƯỜI DÙNG)
   const handleDeleteRoom = (roomId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // 🎯 CHỈNH SỬA CHÍ MẠNG: Bốc chính xác Token bảo mật từ sessionStorage ra
-    const hostToken = sessionStorage.getItem(`host_token_${roomId}`);
-    
-    if (confirm("⚠️ Bạn có chắc chắn muốn xóa phòng này không? Toàn bộ người xem sẽ bị mời ra ngoài.")) {
-      socket.emit("delete_room", { roomId, hostToken });
+    let hostUserId = null;
+    try {
+      const userString = localStorage.getItem("myflix_user");
+      if (userString) {
+        hostUserId = JSON.parse(userString).id;
+      }
+    } catch (e) {}
 
-      try {
-        sessionStorage.removeItem(`myflix_host_of_${roomId}`);
-        sessionStorage.removeItem(`host_token_${roomId}`);
-      } catch (err) {}
+    if (confirm("⚠️ Bạn có chắc chắn muốn xóa phòng này không? Toàn bộ người xem sẽ bị mời ra ngoài.")) {
+      socket.emit("delete_room", { roomId, hostUserId });
     }
   };
 
@@ -148,7 +156,7 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
     showCreateModal, setShowCreateModal,
     roomName, setRoomName,
     searchQuery, setSearchQuery,
-    searchResults,
+    searchResults, setSearchResults,
     isSearching,
     selectedMovie, setSelectedMovie,
     handleCreateRoom, handleShareRoom, handleDeleteRoom

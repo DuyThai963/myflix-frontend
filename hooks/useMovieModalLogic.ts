@@ -26,6 +26,20 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
   const latestTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   const hasInitRef = useRef<string | null>(null); // 🛡️ Cờ chống spam API 2 lần do StrictMode
+  const isHostRef = useRef<boolean>((movie as any)?.isHost || false);
+  const latestSyncTimeRef = useRef<number>(0);
+  const activeEpisodeRef = useRef(activeEpisode);
+  const activeEpisodeNameRef = useRef(activeEpisodeName);
+  const previousEpisodeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activeEpisodeRef.current = activeEpisode;
+    activeEpisodeNameRef.current = activeEpisodeName;
+  }, [activeEpisode, activeEpisodeName]);
+
+  useEffect(() => {
+    if (movie && (movie as any).isHost !== undefined) isHostRef.current = (movie as any).isHost;
+  }, [movie]);
 
   // 📡 1. ĐỒNG BỘ MỐC THỜI GIAN CHO KHÁCH (LUỒNG WATCH PARTY HOST)
   useEffect(() => {
@@ -33,20 +47,61 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     const currentRoomId = urlParams.get("room");
     if (!currentRoomId) return;
 
+    const handleRoomState = (data: any) => {
+      isHostRef.current = data.isHost;
+    };
+    const handlePromoted = () => {
+      isHostRef.current = true;
+    };
+
     const handleRequestCurrentTimeFromHost = ({ targetSocketId }: { targetSocketId: string }) => {
       socket.emit("host_submitted_time_for_newbie", {
         roomId: currentRoomId,
         targetSocketId,
-        currentTime: latestTimeRef.current,
-        isPlaying: isPlayingRef.current
+        // 🎯 BÙ TRỪ LATENCY: Cộng thêm 1.5s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
+        currentTime: latestTimeRef.current + 1.5,
+        isPlaying: isPlayingRef.current,
+        episodeSlug: activeEpisodeRef.current,
+        episodeName: activeEpisodeNameRef.current
       });
     };
 
+    socket.on("room_state", handleRoomState);
+    socket.on("you_are_promoted_to_host", handlePromoted);
     socket.on("request_current_time_from_host", handleRequestCurrentTimeFromHost);
     return () => {
+      socket.off("room_state", handleRoomState);
+      socket.off("you_are_promoted_to_host", handlePromoted);
       socket.off("request_current_time_from_host", handleRequestCurrentTimeFromHost);
     };
   }, []);
+
+  // 📡 1.5. CHỐT NGAY TẬP MỚI VÀO REDIS KHI HOST VỪA VÀO PHÒNG HOẶC ĐỔI TẬP
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get("room");
+    if (roomId && activeEpisode) {
+      if (previousEpisodeRef.current === activeEpisode) {
+        return; // 🛡️ Chặn React Strict Mode hoặc re-render vô ích
+      }
+      if (previousEpisodeRef.current === null) {
+        previousEpisodeRef.current = activeEpisode;
+        return; // 🛡️ Bỏ qua lần render đầu tiên khi Host vừa vào phòng để KHÔNG GHI ĐÈ currentTime cũ thành 0
+      }
+      previousEpisodeRef.current = activeEpisode;
+
+      if (isHostRef.current) {
+        latestSyncTimeRef.current = 0; // Reset mốc đo 5s
+        socket.emit("host_update_room_state", {
+          roomId,
+          currentTime: 0,
+          isPlaying: isPlayingRef.current,
+          episodeSlug: activeEpisode,
+          episodeName: activeEpisodeName
+        });
+      }
+    }
+  }, [activeEpisode, activeEpisodeName]);
 
   // ✕ 2. LẮNG NGHE SỰ KIỆN PHÍM ESC ĐỂ TẮT MODAL KHẨN CẤP
   useEffect(() => {
@@ -210,7 +265,23 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     latestTimeRef.current = currentTime;
     isPlayingRef.current = true;
 
-    if (isWatchPartyActive) return; 
+    if (isWatchPartyActive) {
+      // Nếu là Host, liên tục nã tiến trình và tập phim lên Redis để chốt sổ khi phòng trống
+      if (isHostRef.current) {
+        const roomId = urlParams.get("room");
+        if (roomId && Math.abs(currentTime - latestSyncTimeRef.current) >= 5) {
+          latestSyncTimeRef.current = currentTime;
+          socket.emit("host_update_room_state", {
+            roomId,
+            currentTime: Math.floor(currentTime),
+            isPlaying: true,
+            episodeSlug: activeEpisodeRef.current,
+            episodeName: activeEpisodeNameRef.current
+          });
+        }
+      }
+      return; 
+    }
     if (!movie || !activeEpisode) return;
 
     const token = localStorage.getItem("myflix_token");

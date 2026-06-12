@@ -40,6 +40,9 @@ export function useHomeLogic() {
           id: data.movieState.id || data.roomId,
           slug: data.movieState.slug,
           title: data.movieState.title,
+          watchId_db: data.movieState.episodeSlug ? `${data.movieState.id || data.roomId}-${data.movieState.episodeSlug}` : undefined,
+          currentTime: data.movieState.currentTime || 0,
+          episode_current: data.movieState.episode || "Tập 1",
           origin_name: "", thumb_url: "", poster_url: "",
           year: 2026, duration: "", genre: "", country: "", description: ""
         });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { socket } from "@/services/socket.service";
 
 type HookProps = {
   src: string;
@@ -49,9 +50,20 @@ export function useVideoPlayerLogic({
   const currentTimeRef = useRef(0);
   const isWatchPartyRef = useRef(isWatchParty);
   const prevMovieIdRef = useRef<string | null>(null);
+  const onProgressRef = useRef(onProgress);
+  const roomIdRef = useRef<string | null>(null);
 
   useEffect(() => { isWatchPartyRef.current = isWatchParty; }, [isWatchParty]);
-  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { onProgressRef.current = onProgress; }, [onProgress]);
+  useEffect(() => { 
+    currentTimeRef.current = currentTime; 
+    if (onProgressRef.current) onProgressRef.current(currentTime);
+  }, [currentTime]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    roomIdRef.current = urlParams.get("room");
+  }, []);
 
   const handleUserInteraction = () => {
     setShowControls(true);
@@ -145,7 +157,6 @@ export function useVideoPlayerLogic({
   // 🛡️ HÀM BẮN API TIME-ONLY: SIÊU NHẸ (TIẾT KIỆM BĂNG THÔNG & DB)
   const saveWatchingProgressTimeOnly = (timeToSave: number) => {
     if (timeToSave <= 0) return;
-    if (isWatchPartyRef.current === true || isWatchParty === true) return;
 
     // 🛡️ LỚP CHẮN 1: Chống spam kim giây (Tránh lưu liên tục nếu cách nhau < 2 giây)
     if (Math.abs(timeToSave - lastSavedTimeRef.current) < 2) return;
@@ -159,6 +170,19 @@ export function useVideoPlayerLogic({
     if (String(movieId).includes('-')) {
       currentEpisodeSlug = String(movieId).split('-').slice(1).join('-');
     }
+
+    if (isWatchPartyRef.current === true || isWatchParty === true) {
+      const roomId = roomIdRef.current;
+      if (roomId) {
+        socket.emit("host_update_room_state", {
+          roomId,
+          currentTime: Math.floor(timeToSave),
+          isPlaying: false
+        });
+      }
+      return;
+    }
+
     const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
 
     if (token && userString) {
@@ -317,14 +341,27 @@ export function useVideoPlayerLogic({
 
   useEffect(() => {
     const handleSuddenClose = () => {
-      const targetTime = currentTimeRef.current;
+      let targetTime = currentTimeRef.current;
+      if (videoRef.current && videoRef.current.readyState >= 1) {
+        targetTime = videoRef.current.currentTime;
+      }
+
       // 🛡️ Cho phép targetTime === 0 lọt qua để gửi lệnh dọn rác 0s xuống API /sync
       if (targetTime < 0) return;
-      if (isWatchPartyRef.current === true || isWatchParty === true) return;
-
-      const token = localStorage.getItem("myflix_token");
-      const userString = localStorage.getItem("myflix_user");
       
+      // 🎯 NẾU LÀ PHÒNG XEM CHUNG: BẮN LỆNH CHỐT SỔ CUỐI CÙNG TRƯỚC KHI RÚT LUI HOẶC CHUYỂN TẬP
+      if (isWatchPartyRef.current === true || isWatchParty === true) {
+        const roomId = roomIdRef.current;
+        if (roomId) {
+          socket.emit("host_update_room_state", {
+            roomId,
+            currentTime: Math.floor(targetTime),
+            isPlaying: false
+          });
+        }
+        return;
+      }
+
       // --- KHỐI NHẬN DIỆN THÔNG TIN TẬP PHIM SIÊU CHUẨN (FIXED: BÓC CHUẨN TỪ MOVIEID ĐANG PHÁT) ---
       const originalEpCurrent = movieData?.episode_current || "";
       const cleanMovieId = String(movieId).split('-')[0];
@@ -339,9 +376,13 @@ export function useVideoPlayerLogic({
       const currentEpisodeName = (isActuallySeries && currentEpisodeSlug !== "full") 
         ? `Tập ${currentEpisodeSlug}` 
         : (originalEpCurrent || "Full");
+        
 
       const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
       // -----------------------------------------------------
+
+      const token = localStorage.getItem("myflix_token");
+      const userString = localStorage.getItem("myflix_user");
 
       const historyItem = {
         watchId: finalWatchId,

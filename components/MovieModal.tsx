@@ -3,6 +3,7 @@
 import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useMovieModalLogic, formatEpName } from "@/hooks/useMovieModalLogic";
 
 type Props = {
@@ -31,8 +32,13 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
     latestTimeRef
   } = useMovieModalLogic(movie, onClose);
 
+  const [isRoom, setIsRoom] = useState(false);
+
+  useEffect(() => {
+    setIsRoom(new URLSearchParams(window.location.search).has("room"));
+  }, []);
+
   if (!movie) {
-    const isRoom = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("room");
     if (isRoom) {
       return (
         <motion.div

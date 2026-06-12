@@ -23,14 +23,18 @@ export function useWatchPartyLogic() {
     socket.on("room_state", (roomData) => {
       if (roomData?.movieState?.slug) {
         setSelectedMovie({
-          id: roomData.movieState.slug, // Găm định danh trơn né rác DB
+          id: roomData.movieState.id || roomData.roomId, // 🎯 Bổ sung ID chuẩn để Modal parse ra đúng tập
           slug: roomData.movieState.slug,
           title: roomData.movieState.title,
+          watchId_db: roomData.movieState.episodeSlug ? `${roomData.movieState.id || roomData.roomId}-${roomData.movieState.episodeSlug}` : undefined,
+          currentTime: roomData.movieState.currentTime || 0,
           origin_name: "", thumb_url: "", poster_url: "", banner: "", stream: "",
           description: "", year: 2026, duration: "", genre: "", country: "",
           episode_current: roomData.movieState.episode || "Tập 1",
           episode_total: "1"
         });
+        // 🎯 Gắn lại thời gian từ DB Redis để phát tiếp ngay mốc đã lưu
+        setInitialTime(roomData.movieState.currentTime || 0);
       }
     });
 

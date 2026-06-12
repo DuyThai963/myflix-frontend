@@ -1,6 +1,8 @@
 "use client";
 
 import { useWatchPartyHubLogic } from "@/hooks/useWatchPartyHubLogic";
+import { useEffect, useState } from "react";
+import { socket } from "@/services/socket.service";
 
 interface HubProps {
   onJoinRoomClick: (roomId: string) => void; // Khai báo Props nhận ống dẫn từ Page tổng
@@ -13,11 +15,34 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
     showCreateModal, setShowCreateModal,
     roomName, setRoomName,
     searchQuery, setSearchQuery,
-    searchResults,
+    searchResults, setSearchResults,
     isSearching,
     selectedMovie, setSelectedMovie,
     handleCreateRoom, handleShareRoom, handleDeleteRoom
   } = useWatchPartyHubLogic(onJoinRoomClick);
+
+  // 🔒 1. Lấy định danh user hiện tại (Dùng để đối chiếu quyền trên FE)
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const userString = localStorage.getItem("myflix_user");
+      if (userString) setCurrentUser(JSON.parse(userString));
+    } catch(e) {}
+  }, []);
+
+  // 🎯 2. LỌC PHÒNG RIÊNG TƯ: Chỉ hiện phòng do mình tạo HOẶC phòng mình đã vào xem chung
+  const visibleRooms = rooms.filter((room: any) => {
+    if (!currentUser) return false;
+    const isHost = String(room.hostUserId) === String(currentUser.id);
+    const isJoined = room.joinedUserIds && room.joinedUserIds.map(String).includes(String(currentUser.id));
+    const isCurrentlyInUsers = room.users && room.users.some((u: any) => String(u.userId) === String(currentUser.id));
+    return isHost || isJoined || isCurrentlyInUsers;
+  });
+
+  if (!mounted) return null; // 🛡️ Tránh lỗi Hydration Mismatch giữa SSR và Client
 
   return (
     <div className="p-4 md:p-12 bg-zinc-950 min-h-screen text-white mt-16 select-none animate-in fade-in duration-300">
@@ -42,15 +67,20 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
       </div>
 
       <div className="max-w-7xl mx-auto">
-        {rooms.length === 0 ? (
+        {!currentUser ? (
+          <div className="text-center py-24 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20 backdrop-blur-sm">
+            <span className="text-4xl block mb-3">🔒</span>
+            <p className="text-zinc-500 text-sm font-medium">Vui lòng đăng nhập để xem danh sách phòng của bạn.</p>
+          </div>
+        ) : visibleRooms.length === 0 ? (
           <div className="text-center py-24 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20 backdrop-blur-sm">
             <span className="text-4xl block mb-3">🍿</span>
-            <p className="text-zinc-500 text-sm font-medium">Hiện chưa có phòng nào hoạt động. Hãy là người đầu tiên tạo phòng!</p>
+            <p className="text-zinc-500 text-sm font-medium">Bạn chưa tạo hoặc tham gia phòng xem chung nào.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rooms.map((room) => {
-              const amITheHost = typeof window !== "undefined" && sessionStorage.getItem(`myflix_host_of_${room.roomId}`) === "true";
+            {visibleRooms.map((room: any) => {
+              const amITheHost = String(room.hostUserId) === String(currentUser.id);
 
               return (
                 <div key={room.roomId} className="bg-zinc-900/60 border border-zinc-800/80 p-5 rounded-xl flex flex-col justify-between hover:border-zinc-700 hover:bg-zinc-900 transition-all duration-300 relative group shadow-xl">
@@ -97,6 +127,15 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
                       onClick={() => {
                         const newUrl = `${window.location.pathname}?room=${room.roomId}`;
                         window.history.pushState({}, "", newUrl);
+
+                        // 🎯 ÉP SERVER TRẢ VỀ DỮ LIỆU TƯƠI NHẤT TRƯỚC KHI MỞ MODAL ĐỂ TRÁNH LỖI GHI ĐÈ TIME 0S
+                        const userString = localStorage.getItem("myflix_user");
+                        const user = userString ? JSON.parse(userString) : null;
+                        const userName = user?.username || `ChiếnHữu_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                        const userId = user?.id || null;
+                        const hostToken = sessionStorage.getItem(`host_token_${room.roomId}`) || null;
+                        socket.emit("join_room", { roomId: room.roomId, userName, userId, hostToken });
+
                         onJoinRoomClick(room.roomId);
                       }}
                       className="bg-white text-black font-extrabold px-4 py-1.5 rounded-md text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 cursor-pointer shadow-md"
