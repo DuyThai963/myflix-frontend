@@ -138,7 +138,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
             />
 
             {showSuggestions && (keyword.trim().length >= 2 || searchHistory.length > 0) && (
-              <div className="absolute top-full mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
+              <div className="absolute top-full right-0 mt-2 w-[280px] sm:w-[350px] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
                 
                 {keyword.trim().length >= 2 ? (
                   isSearching ? (
@@ -161,7 +161,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                           alt={movie.name} 
                           className="w-7 aspect-[2/3] rounded object-cover flex-shrink-0" 
                         />
-                        <div className="flex flex-col truncate">
+                        <div className="flex flex-col truncate flex-1 min-w-0">
                           <span className="text-xs font-semibold text-white truncate">{movie.name}</span>
                           <span className="text-[10px] text-zinc-400">{movie.year} | {movie.episode_current || "Full"}</span>
                         </div>
@@ -183,15 +183,15 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                         <div
                           key={idx}
                           onClick={() => { handleSearchSubmit(item); setShowSuggestions(false); }}
-                          className="flex items-center justify-between p-2 hover:bg-zinc-800 rounded cursor-pointer transition-colors group"
+                          className="flex items-center justify-between p-2 hover:bg-zinc-800 rounded cursor-pointer transition-colors group gap-2"
                         >
-                          <div className="flex items-center gap-2 text-sm text-zinc-300">
-                            <FaSearch className="text-zinc-500 text-xs" />
+                          <div className="flex items-center gap-2 text-sm text-zinc-300 flex-1 min-w-0">
+                            <FaSearch className="text-zinc-500 text-xs shrink-0" />
                             <span className="truncate">{item}</span>
                           </div>
                           <button
                             onClick={(e) => handleRemoveHistory(e, item)}
-                            className="text-zinc-600 hover:text-white p-1 text-xs opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90"
+                        className="text-zinc-500 hover:text-white p-1 text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90 shrink-0"
                           >
                             ✕
                           </button>

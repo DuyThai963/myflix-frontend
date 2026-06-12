@@ -80,6 +80,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         cursor-pointer
         bg-zinc-900
         group
+        transform-gpu
         
         /* CHUẨN TAILWIND HOVER: Chỉ tương tác khi dùng chuột ở PC/Máy chiếu */
         @media:pointer-fine:hover:scale-105 
@@ -143,7 +144,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
       <div
         className="
           info-overlay
-          absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent
+          absolute inset-0 z-10 bg-gradient-to-t from-black/95 via-black/20 to-transparent
           transition-opacity duration-300 flex flex-col justify-end p-2.5
         "
       >
