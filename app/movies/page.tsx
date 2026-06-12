@@ -61,12 +61,6 @@ export default function MoviesPage() {
     fetchMovies(nextPage);
   };
 
-  const filteredList = useMemo(() => {
-    return movies.filter((movie) =>
-      movie.title.toLowerCase().includes(keyword.toLowerCase())
-    );
-  }, [movies, keyword]);
-
   return (
     <main className="bg-black min-h-screen text-white flex flex-col">
       <Navbar keyword={keyword} setKeyword={setKeyword} />
@@ -75,7 +69,7 @@ export default function MoviesPage() {
         <h1 className="text-3xl font-bold mb-8">Movies</h1>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filteredList.map((movie) => (
+          {movies.map((movie) => (
             <div key={movie.id} className="w-full">
               <MovieCard movie={movie} onClick={() => setSelectedMovie(movie)} />
             </div>
@@ -83,7 +77,7 @@ export default function MoviesPage() {
         </div>
 
         {/* Nút Tải thêm */}
-        {hasMore && !keyword && (
+        {hasMore && (
           <div className="flex justify-center mt-12">
             <button
               onClick={handleLoadMore}

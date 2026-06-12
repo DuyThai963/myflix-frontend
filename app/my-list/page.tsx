@@ -61,13 +61,6 @@ export default function MyList() {
     }
   };
 
-  // Lọc danh sách theo từ khóa search trên Navbar
-  const filteredList = useMemo(() => {
-    return myList.filter((movie) =>
-      movie.title.toLowerCase().includes(keyword.toLowerCase())
-    );
-  }, [myList, keyword]);
-
   return (
     <main className="bg-black min-h-screen text-white flex flex-col">
       <Navbar keyword={keyword} setKeyword={setKeyword} />
@@ -117,9 +110,9 @@ export default function MyList() {
           )}
         </div>
 
-        {filteredList.length > 0 ? (
+        {myList.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {filteredList.map((movie) => (
+            {myList.map((movie) => (
               <div key={movie.id} className="w-full">
                 <MovieCard
                   movie={movie}
@@ -134,9 +127,7 @@ export default function MyList() {
             <span className="text-6xl mb-4">🎬</span>
             <p className="text-xl">Danh sách của bạn đang trống.</p>
             <p className="text-sm mt-2">
-              {keyword 
-                ? "Không tìm thấy phim nào khớp với từ khóa." 
-                : "Hãy thêm những bộ phim bạn yêu thích vào đây nhé!"}
+              Hãy thêm những bộ phim bạn yêu thích vào đây nhé!
             </p>
           </div>
         )}

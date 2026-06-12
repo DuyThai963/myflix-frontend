@@ -18,6 +18,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
     searchHistory,
     suggestions,
     showSuggestions, setShowSuggestions,
+    isSearching,
     isLoggedIn,
     showLoginModal, setShowLoginModal,
     showUserDropdown, setShowUserDropdown,
@@ -136,28 +137,20 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               }} 
             />
 
-            {showSuggestions && showSearch && (searchHistory.length > 0 || (keyword.trim().length >= 2 && suggestions.length > 0)) && (
-              <div className="absolute top-full right-0 w-64 md:w-80 bg-zinc-950/95 border border-zinc-800 rounded-lg mt-2 z-50 shadow-2xl p-2 flex flex-col gap-2 max-h-96 overflow-y-auto backdrop-blur-md">
-                {keyword.trim().length < 2 && searchHistory.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-1">Tìm kiếm gần đây</p>
-                    {searchHistory.map((text, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => { setKeyword(text); handleSearchSubmit(text); }}
-                        className="flex items-center justify-between text-xs text-zinc-300 hover:bg-zinc-900 px-2 py-1.5 rounded cursor-pointer group"
-                      >
-                        <span className="truncate">{text}</span>
-                        <button onClick={(e) => handleRemoveHistory(e, text)} className="text-zinc-500 hover:text-red-500 transition-colors px-1">✕</button>
-                      </div>
-                    ))}
+            {showSuggestions && (keyword.trim().length >= 2 || searchHistory.length > 0) && (
+              <div className="absolute top-full mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
+                
+                {keyword.trim().length >= 2 ? (
+                  isSearching ? (
+                  /* TRẠNG THÁI 1: ĐANG FETCH API */
+                  <div className="p-4 text-center text-zinc-400 text-sm flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-600 rounded-full animate-spin" />
+                    Đang tìm kiếm...
                   </div>
-                )}
-
-                {keyword.trim().length >= 2 && suggestions.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-1">Gợi ý phim</p>
-                    {suggestions.map((movie: any) => (
+                ) : suggestions.length > 0 ? (
+                  /* TRẠNG THÁI 2: CÓ KẾT QUẢ */
+                  <ul>
+                    {suggestions.map((movie) => (
                       <div
                         key={movie._id || movie.slug}
                         onClick={() => { handleSearchSubmit(movie.name); setShowSuggestions(false); }}
@@ -174,8 +167,40 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                         </div>
                       </div>
                     ))}
+                  </ul>
+                ) : (
+                  /* TRẠNG THÁI 3: KHÔNG TÌM THẤY */
+                  <div className="p-4 text-center text-zinc-400 text-sm">
+                    Không tìm thấy phim nào khớp với "{keyword}"
+                  </div>
+                  )
+                ) : (
+                  /* TRẠNG THÁI 4: LỊCH SỬ TÌM KIẾM */
+                  <div className="p-2">
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider px-2 mb-2 mt-1">Lịch sử tìm kiếm</p>
+                    <ul>
+                      {searchHistory.map((item, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => { handleSearchSubmit(item); setShowSuggestions(false); }}
+                          className="flex items-center justify-between p-2 hover:bg-zinc-800 rounded cursor-pointer transition-colors group"
+                        >
+                          <div className="flex items-center gap-2 text-sm text-zinc-300">
+                            <FaSearch className="text-zinc-500 text-xs" />
+                            <span className="truncate">{item}</span>
+                          </div>
+                          <button
+                            onClick={(e) => handleRemoveHistory(e, item)}
+                            className="text-zinc-600 hover:text-white p-1 text-xs opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </ul>
                   </div>
                 )}
+
               </div>
             )}
           </div>

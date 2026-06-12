@@ -241,17 +241,16 @@ export function useHomeLogic() {
   // 🗂️ 6. LUỒNG PHÂN CHIA DANH MỤC PHIM (DÙNG USEMEMO TỐI ƯU SẠCH RE-RENDER)
   const movieSections = useMemo(() => {
     if (movies.length === 0) return [];
-    const filtered = movies.filter((m) => m.title.toLowerCase().includes(keyword.toLowerCase()));
 
     return [
-      { title: "Trending Now", movies: filtered.slice(0, 10) },
-      { title: "Phim Trung Quốc", movies: filtered.filter((m) => m.country === "Trung Quốc") },
-      { title: "Phim Hàn Quốc", movies: filtered.filter((m) => m.country === "Hàn Quốc") },
-      { title: "Hành động", movies: filtered.filter((m) => m.genre === "Hành động") },
-      { title: "Chính kịch", movies: filtered.filter((m) => m.genre === "Chính kịch") },
-      { title: "Âu Mỹ", movies: filtered.filter((m) => m.country === "Âu Mỹ") },
+      { title: "Trending Now", movies: movies.slice(0, 10) },
+      { title: "Phim Trung Quốc", movies: movies.filter((m) => m.country === "Trung Quốc") },
+      { title: "Phim Hàn Quốc", movies: movies.filter((m) => m.country === "Hàn Quốc") },
+      { title: "Hành động", movies: movies.filter((m) => m.genre === "Hành động") },
+      { title: "Chính kịch", movies: movies.filter((m) => m.genre === "Chính kịch") },
+      { title: "Âu Mỹ", movies: movies.filter((m) => m.country === "Âu Mỹ") },
     ].filter((section) => section.movies.length > 0);
-  }, [movies, keyword]);
+  }, [movies]);
 
   return {
     selectedMovie, setSelectedMovie,

@@ -9,6 +9,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   
   // 🔐 Quản lý Đăng nhập & Xác thực tài khoản
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -113,23 +114,37 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
 
   // 🔍 Xử lý tìm kiếm định thời Debounce Suggestions phim
   useEffect(() => {
-    if (keyword.trim().length < 2) {
+    const cleanKeyword = keyword.trim();
+    
+    // 🛡️ GIỚI HẠN KÝ TỰ: Gõ ít nhất 2 ký tự mới gọi API, tiết kiệm tài nguyên
+    if (cleanKeyword.length < 2) {
       setSuggestions([]);
+      setIsSearching(false);
       return;
     }
+    
+    setIsSearching(true);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(keyword.trim())}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(cleanKeyword)}`, {
           signal: controller.signal
         });
         const data = await response.json();
         if (data?.data?.items) {
           setSuggestions(data.data.items.slice(0, 5));
+        } else {
+          setSuggestions([]);
         }
       } catch (error: any) {
         if (error.name !== "AbortError") console.error("Suggestions Error:", error);
+        if (error.name !== "AbortError") {
+          console.error("Suggestions Error:", error);
+          setSuggestions([]);
+        }
+      } finally {
+        setIsSearching(false);
       }
     }, 350);
 
@@ -192,6 +207,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     searchHistory,
     suggestions,
     showSuggestions, setShowSuggestions,
+    isSearching,
     isLoggedIn,
     showLoginModal, setShowLoginModal,
     showUserDropdown, setShowUserDropdown,
