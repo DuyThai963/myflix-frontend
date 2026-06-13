@@ -68,6 +68,18 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
     setJoinRoomId("");
   };
 
+  // 🎯 HÀM LỌC THÔNG MINH: Tự động trích xuất mã phòng nếu user dán nguyên cả đoạn text share hoặc full URL
+  const handleRoomIdInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value;
+    // Dùng Regex tìm đoạn bắt đầu bằng "wp_" và theo sau là các ký tự chữ/số
+    const match = text.match(/(wp_[a-zA-Z0-9]+)/);
+    if (match) {
+      setJoinRoomId(match[1]); // Nếu thấy mã, bóc đúng mã ra
+    } else {
+      setJoinRoomId(text); // Nếu không thấy mã chuẩn, cứ để nguyên text cho người ta gõ
+    }
+  };
+
   return (
     <div className="p-4 md:p-12 bg-zinc-950 min-h-screen text-white mt-16 select-none animate-in fade-in duration-300">
       <div className="flex justify-between items-center mb-8 max-w-7xl mx-auto">
@@ -278,7 +290,7 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
             
             <div className="mb-6">
               <input 
-                type="text" required value={joinRoomId} onChange={(e) => setJoinRoomId(e.target.value)}
+                type="text" required value={joinRoomId} onChange={handleRoomIdInput}
                 placeholder="VD: wp_abc123..."
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-3 text-sm text-white focus:outline-none focus:border-red-600 transition-colors placeholder:text-zinc-600 font-mono tracking-wider"
               />

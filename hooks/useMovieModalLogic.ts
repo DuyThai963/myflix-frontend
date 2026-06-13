@@ -53,13 +53,16 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     const handlePromoted = () => {
       isHostRef.current = true;
     };
+    const handleDemoted = () => {
+      isHostRef.current = false;
+    };
 
     const handleRequestCurrentTimeFromHost = ({ targetSocketId }: { targetSocketId: string }) => {
       socket.emit("host_submitted_time_for_newbie", {
         roomId: currentRoomId,
         targetSocketId,
-        // 🎯 BÙ TRỪ LATENCY: Cộng thêm 32s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
-        currentTime: latestTimeRef.current + 32,
+        // 🎯 BÙ TRỪ LATENCY: Cộng thêm 1.5s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
+        currentTime: latestTimeRef.current + 1.5,
         isPlaying: isPlayingRef.current,
         episodeSlug: activeEpisodeRef.current,
         episodeName: activeEpisodeNameRef.current
@@ -68,10 +71,12 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
 
     socket.on("room_state", handleRoomState);
     socket.on("you_are_promoted_to_host", handlePromoted);
+    socket.on("you_are_demoted_to_guest", handleDemoted);
     socket.on("request_current_time_from_host", handleRequestCurrentTimeFromHost);
     return () => {
       socket.off("room_state", handleRoomState);
       socket.off("you_are_promoted_to_host", handlePromoted);
+      socket.off("you_are_demoted_to_guest", handleDemoted);
       socket.off("request_current_time_from_host", handleRequestCurrentTimeFromHost);
     };
   }, []);

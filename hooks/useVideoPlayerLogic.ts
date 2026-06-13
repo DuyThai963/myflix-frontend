@@ -215,6 +215,11 @@ export function useVideoPlayerLogic({
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+
+      if (isWatchPartyRef.current === true || isWatchParty === true) {
+        const roomId = roomIdRef.current;
+        if (roomId) socket.emit("host_action_sync", { roomId, currentTime: videoRef.current.currentTime, isPlaying: false });
+      }
       
       // 🛡️ LỚP CHẮN 2: Debounce nút Pause (Đợi 1000ms mới kích hoạt lưu)
       pauseTimeoutRef.current = setTimeout(() => {
@@ -227,6 +232,11 @@ export function useVideoPlayerLogic({
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
       handleUserInteraction();
+
+      if (isWatchPartyRef.current === true || isWatchParty === true) {
+        const roomId = roomIdRef.current;
+        if (roomId) socket.emit("host_action_sync", { roomId, currentTime: videoRef.current.currentTime, isPlaying: true });
+      }
     }
   };
 
@@ -241,8 +251,15 @@ export function useVideoPlayerLogic({
   const skipTime = (e: React.MouseEvent, amount: number) => {
     e.stopPropagation();
     if (!videoRef.current) return;
-    videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
+    const newTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
     handleUserInteraction();
+
+    if (isWatchPartyRef.current === true || isWatchParty === true) {
+      const roomId = roomIdRef.current;
+      if (roomId) socket.emit("host_action_sync", { roomId, currentTime: newTime, isPlaying: !videoRef.current.paused });
+    }
   };
 
   const handleSkipIntro = (e: React.MouseEvent) => {
@@ -305,6 +322,11 @@ export function useVideoPlayerLogic({
     video.currentTime = percentage * duration;
     setCurrentTime(video.currentTime);
     handleUserInteraction();
+
+    if (isWatchPartyRef.current === true || isWatchParty === true) {
+      const roomId = roomIdRef.current;
+      if (roomId) socket.emit("host_action_sync", { roomId, currentTime: video.currentTime, isPlaying: !video.paused });
+    }
   };
 
   useEffect(() => {
@@ -500,6 +522,13 @@ export function useVideoPlayerLogic({
       video.addEventListener('loadedmetadata', () => {
         setDuration(video.duration);
         video.currentTime = savedTime; 
+        
+        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho iOS/Safari)
+        if (isWatchPartyRef.current === true || isWatchParty === true) {
+          const roomId = roomIdRef.current;
+          if (roomId) socket.emit("guest_ready_to_sync", { roomId });
+        }
+        
         video.play().catch(() => {});
         setLoading(false);
       }, { once: true });
@@ -517,6 +546,13 @@ export function useVideoPlayerLogic({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setDuration(video.duration);
         video.currentTime = savedTime; 
+        
+        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho Chrome/Edge/PC)
+        if (isWatchPartyRef.current === true || isWatchParty === true) {
+          const roomId = roomIdRef.current;
+          if (roomId) socket.emit("guest_ready_to_sync", { roomId });
+        }
+        
         video.play().catch(() => {});
       });
       
@@ -552,7 +588,7 @@ export function useVideoPlayerLogic({
     const seekPolling = setInterval(() => {
       attempts++;
       if (video && video.readyState >= 1) {
-        if (Math.abs(video.currentTime - initialTime) > 3 && attempts <= 20) {
+        if (Math.abs(video.currentTime - initialTime) > 0.5 && attempts <= 20) {
           video.pause(); setIsPlaying(false);
           video.currentTime = initialTime; setCurrentTime(initialTime);
         } else {
@@ -566,6 +602,55 @@ export function useVideoPlayerLogic({
     }, 400);
     return () => clearInterval(seekPolling);
   }, [initialTime, src, movieId]);
+
+  // 🎯 LUỒNG HARD SYNC: ACTION TỪ HOST (PLAY/PAUSE/SEEK) ĐỂ TRẢ LỜI NGAY TỨC THÌ (< 0.5s)
+  useEffect(() => {
+    if (isWatchPartyRef.current !== true && isWatchParty !== true) return;
+    
+    const handleSyncAction = ({ currentTime, isPlaying: hostPlaying }: { currentTime: number, isPlaying: boolean }) => {
+      const video = videoRef.current;
+      if (!video) return;
+      
+      // Kéo kim thật chặt (0.5s) khi Host thao tác tay
+      if (Math.abs(video.currentTime - currentTime) > 0.5) {
+        video.currentTime = currentTime;
+        setCurrentTime(currentTime);
+      }
+      
+      if (hostPlaying && video.paused) {
+        video.play().then(() => setIsPlaying(true)).catch(() => {
+          video.muted = true; setIsMuted(true);
+          video.play().then(() => setIsPlaying(true));
+        });
+      } else if (!hostPlaying && !video.paused) {
+        video.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    socket.on("sync_action_from_host", handleSyncAction);
+    return () => socket.off("sync_action_from_host", handleSyncAction);
+  }, [isWatchParty]);
+
+  // 🎯 LUỒNG SOFT SYNC: HEARTBEAT ĐỂ NẮN CHỈNH KHI BỊ TRÔI SAU VÀI GIÂY ỔN ĐỊNH
+  useEffect(() => {
+    if (isWatchPartyRef.current !== true && isWatchParty !== true) return;
+    
+    const handleSoftSync = ({ currentTime, isPlaying: hostPlaying }: { currentTime: number, isPlaying: boolean }) => {
+      const video = videoRef.current;
+      if (!video || video.paused) return; // Nếu Guest đang tự pause đi WC thì không ép
+      
+      // Bù ping 1.5s giống lúc vào phòng. Nếu lệch > 2s (VD: do lag mạng), kéo âm thầm về +1.5s!
+      const diff = video.currentTime - currentTime;
+      if (Math.abs(diff) > 2) { 
+         video.currentTime = currentTime + 1.5;
+         setCurrentTime(video.currentTime);
+      }
+    };
+    
+    socket.on("soft_sync_from_host", handleSoftSync);
+    return () => socket.off("soft_sync_from_host", handleSoftSync);
+  }, [isWatchParty]);
 
   useEffect(() => {
     if (isPlaying) handleUserInteraction();
