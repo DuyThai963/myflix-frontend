@@ -72,13 +72,14 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
       >
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer"
+          className="absolute right-4 z-50 bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer"
+          style={{ top: 'max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.5rem))' }}
         >
           ✕
         </button>
 
         {/* Khối Trình phát Video (Custom HLS Player hoặc IFrame Embed Dự Phòng) */}
-        <div className="w-full aspect-video bg-black relative shrink-0">
+        <div className="w-full bg-black relative shrink-0 overflow-hidden h-[38vh] sm:h-[42vh] md:h-[48vh] lg:h-[52vh]">
           {streamUrl ? (
             <VideoPlayer 
               key={`${movie.id}-${activeEpisode}`}
@@ -90,7 +91,9 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               initialTime={isWatchParty && typeof initialTime === "number" && initialTime > 0 ? Math.floor(initialTime) : (typeof movie.currentTime === 'number' ? Math.floor(movie.currentTime) : initialTime)}
               onFullscreenChange={(isFullscreenNow) => setIsPlayerFullscreen(isFullscreenNow)}
               movieData={fullMovieDetail || movie}
-              isWatchParty={isWatchParty} 
+              isWatchParty={isWatchParty}
+              serverName={activeServer}
+              isEmbed={isEmbedMode}
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50">
@@ -146,6 +149,21 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                           setActiveEpisode(targetEp.slug);
                           setActiveEpisodeName(formatEpName(targetEp.name));
 
+                          // 💾 Lưu server mới lên DB (chỉ xém cá nhân)
+                          const urlParamsCheck = new URLSearchParams(window.location.search);
+                          if (!urlParamsCheck.has("room")) {
+                            const tkn = localStorage.getItem("myflix_token");
+                            const usrStr = localStorage.getItem("myflix_user");
+                            if (tkn && usrStr) {
+                              const usr = JSON.parse(usrStr);
+                              fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ userId: usr.id, movieId: movie.id, currentTime: Math.floor(latestTimeRef.current || 0), serverName: server.server_name, isEmbed: isEmbedMode })
+                              }).catch(() => {});
+                            }
+                          }
+
                           const urlParams = new URLSearchParams(window.location.search);
                           const roomId = urlParams.get("room");
                           if (roomId && isHost) {
@@ -181,6 +199,20 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       if (currentEp && (currentEp.link_m3u8 || currentEp.link_embed)) {
                         setStreamUrl(currentEp.link_m3u8 || currentEp.link_embed);
                       }
+                      // 💾 Lưu chế độ m3u8 lên DB (chỉ xém cá nhân)
+                      const urlParamsCheckM = new URLSearchParams(window.location.search);
+                      if (!urlParamsCheckM.has("room")) {
+                        const tkn = localStorage.getItem("myflix_token");
+                        const usrStr = localStorage.getItem("myflix_user");
+                        if (tkn && usrStr) {
+                          const usr = JSON.parse(usrStr);
+                          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userId: usr.id, movieId: movie.id, currentTime: Math.floor(latestTimeRef.current || 0), serverName: activeServer, isEmbed: false })
+                          }).catch(() => {});
+                        }
+                      }
                       const urlParams = new URLSearchParams(window.location.search);
                       const roomId = urlParams.get("room");
                       if (roomId && isHost) {
@@ -209,6 +241,20 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       const currentEp = episodes.find((ep: any) => ep.slug === activeEpisode) || episodes[0];
                       if (currentEp && (currentEp.link_embed || currentEp.link_m3u8)) {
                         setStreamUrl(currentEp.link_embed || currentEp.link_m3u8);
+                      }
+                      // 💾 Lưu chế độ embed lên DB (chỉ xém cá nhân)
+                      const urlParamsCheckE = new URLSearchParams(window.location.search);
+                      if (!urlParamsCheckE.has("room")) {
+                        const tkn = localStorage.getItem("myflix_token");
+                        const usrStr = localStorage.getItem("myflix_user");
+                        if (tkn && usrStr) {
+                          const usr = JSON.parse(usrStr);
+                          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userId: usr.id, movieId: movie.id, currentTime: Math.floor(latestTimeRef.current || 0), serverName: activeServer, isEmbed: true })
+                          }).catch(() => {});
+                        }
                       }
                       const urlParams = new URLSearchParams(window.location.search);
                       const roomId = urlParams.get("room");
@@ -254,9 +300,14 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                 </button>
               </div>
 
-              <p className="text-zinc-400 leading-relaxed text-sm md:text-base">
-                {movie.description || "Chưa có mô tả cho bộ phim này."}
-              </p>
+              <div
+                className="text-zinc-400 leading-relaxed text-sm md:text-base prose-sm max-w-none [&_p]:mb-2"
+                dangerouslySetInnerHTML={{
+                  __html: (movie.description || "Chưa có mô tả cho bộ phim này.")
+                    .replace(/<script[\s\S]*?<\/script>/gi, "") // strip scripts
+                    .trim()
+                }}
+              />
             </div>
 
             {/* Khối hiển thị danh sách tập phim */}

@@ -86,7 +86,6 @@ export function useHomeLogic() {
           
           if (res.ok) {
             const dbData = await res.json();
-            console.log("📺 [FE Home History] User Logged In -> Raw DB history from Neon:", dbData);
             
             if (!dbData || dbData.length === 0) {
               sessionStorage.removeItem("myflix_db_history");
@@ -125,7 +124,6 @@ export function useHomeLogic() {
             });
             
             const finalHistoryList = Array.from(uniqueMoviesMap.values());
-            console.log("✅ [FE Home History SUCCESS] Processed Continue Watching List:", finalHistoryList);
             setContinueWatching(finalHistoryList);
             return;
           }

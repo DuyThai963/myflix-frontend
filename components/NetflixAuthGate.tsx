@@ -85,7 +85,10 @@ export default function NetflixAuthGate({ children }: { children: React.ReactNod
       <div className="relative min-h-screen w-full bg-[linear-gradient(180deg,#3d060b_0%,#180305_25%,#0d0d0d_60%,#000000_100%)] flex flex-col justify-between">
         
         {/* HEADER: LOGO MYFLIX CHUẨN ĐỎ NETFLIX */}
-        <header className="relative z-10 flex items-center justify-between px-8 sm:px-16 md:px-32 py-7 sm:py-9">
+        <header
+          className="relative z-10 flex items-center justify-between px-8 sm:px-16 md:px-32 py-7 sm:py-9"
+          style={{ paddingTop: 'max(1.75rem, calc(env(safe-area-inset-top, 0px) + 0.75rem))' }}
+        >
           <h1 className="text-[#e50914] text-4xl sm:text-5xl font-black tracking-tighter cursor-pointer drop-shadow-lg">
             MYFLIX
           </h1>

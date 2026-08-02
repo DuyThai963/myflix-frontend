@@ -77,11 +77,12 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     };
 
     const handleRequestCurrentTimeFromHost = ({ targetSocketId }: { targetSocketId: string }) => {
+      const timeToReturn = latestTimeRef.current + 1.5;
       socket.emit("host_submitted_time_for_newbie", {
         roomId: currentRoomId,
         targetSocketId,
         // 🎯 BÙ TRỪ LATENCY: Cộng thêm 1.5s để trừ hao thời gian truyền mạng và thời gian Player của Guest Buffer video tải lên
-        currentTime: latestTimeRef.current + 1.5,
+        currentTime: timeToReturn,
         isPlaying: isPlayingRef.current,
         episodeSlug: activeEpisodeRef.current,
         episodeName: activeEpisodeNameRef.current,
@@ -141,6 +142,38 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
       });
     }
   }, [activeEpisode, activeEpisodeName, activeServer, isEmbedMode]);
+
+  // ⏱️ TIMER TỰ ĐỘNG ĐẾM GIỜ CHO EMBED MODE (SERVER 2)
+  // Vì thẻ <iframe> không bắn sự kiện onTimeUpdate trực tiếp sang React, 
+  // ta chạy Timer +1s mỗi giây để Host luôn giữ mốc thời gian sống thực tế của Embed player!
+  useEffect(() => {
+    if (!isEmbedMode) return;
+
+    // Lắng nghe postMessage từ iframe (nếu embed player gửi)
+    const handleWindowMessage = (event: MessageEvent) => {
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data && typeof data.currentTime === "number" && data.currentTime > 0) {
+          latestTimeRef.current = data.currentTime;
+        } else if (data && typeof data.time === "number" && data.time > 0) {
+          latestTimeRef.current = data.time;
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener("message", handleWindowMessage);
+
+    // Timer chạy song song: Tự động cộng 1s mỗi giây khi xem Embed
+    const embedTimer = setInterval(() => {
+      latestTimeRef.current += 1;
+      isPlayingRef.current = true;
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("message", handleWindowMessage);
+      clearInterval(embedTimer);
+    };
+  }, [isEmbedMode, activeEpisode, activeServer]);
 
   // 📡 1.6. GUEST TỰ ĐỘNG CHUYỂN TẬP / SERVER / PLAYER MODE THEO TÍN HIỆU TỪ HOST REALTIME
   useEffect(() => {
@@ -250,6 +283,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
           if (data.movie) setFullMovieDetail(data.movie);
 
           setEpisodeData(data.episodes);
+          // 🎯 Ưu tiên: server được lưu trong DB history (foundServerName), sau đó mới dùng server từ Watch Party prop
           const targetServerName = (movie as any)?.serverName || (movie as any)?.server_name || "";
           let selectedServer = data.episodes[0];
           if (targetServerName) {
@@ -268,6 +302,8 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
             const isWatchPartyActive = urlParams.has("room");
 
             let foundHistorySlug: string | null = null;
+            let foundServerName: string | null = null;
+            let foundIsEmbed: boolean = false;
             if (!isWatchPartyActive) {
               try {
                 // Check Guest
@@ -283,7 +319,11 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
                   if (dbHist) {
                     const histArr = JSON.parse(dbHist);
                     const found = histArr.find((h: any) => String(h.watchId).startsWith(targetMovieId));
-                    if (found) foundHistorySlug = found.episodeSlug || found.episodeslug;
+                    if (found) {
+                      foundHistorySlug = found.episodeSlug || found.episodeslug;
+                      foundServerName = found.serverName || null;
+                      foundIsEmbed = found.isEmbed === true;
+                    }
                   }
                 }
               } catch (e) {}
@@ -308,7 +348,18 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
               startEpisode = chosenEp;
             }
 
-            const targetEmbedMode = Boolean((movie as any)?.isEmbedMode);
+            // 🎯 3. RESTORE SERVER TỪ DB HISTORY (nhảy vào đúng server user đang xem lần trước)
+            if (foundServerName && !isWatchPartyActive) {
+              const restoredServer = data.episodes.find((s: any) => s.server_name === foundServerName);
+              if (restoredServer) {
+                setActiveServer(restoredServer.server_name);
+                setEpisodes(restoredServer.server_data);
+                const epInNewServer = restoredServer.server_data.find((ep: any) => String(ep.slug) === String(foundHistorySlug || (startEpisode?.slug || "")));
+                if (epInNewServer) startEpisode = epInNewServer;
+              }
+            }
+
+            const targetEmbedMode = foundIsEmbed || Boolean((movie as any)?.isEmbedMode);
             setIsEmbedMode(targetEmbedMode);
 
             const targetUrl = targetEmbedMode 
@@ -367,7 +418,9 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
                         episodeSlug: startEpisode.slug,
                         episodeName: formatEpName(startEpisode.name),
                         currentTime: 0,
-                        movie: moviePayload
+                        movie: moviePayload,
+                        serverName: selectedServer?.server_name || "",
+                        isEmbed: targetEmbedMode
                       };
                       fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/init`, {
                         method: "POST",

@@ -14,7 +14,7 @@ export function useWatchPartyLogic() {
     }
 
     // Lắng nghe mốc thời gian khởi tạo từ Host truyền cho Guest
-    const handleSyncInitialTime = ({ currentTime }: { currentTime: number }) => {
+    const handleSyncInitialTime = ({ currentTime, isPlaying }: { currentTime: number, isPlaying?: boolean }) => {
       setInitialTime(currentTime);
     };
 

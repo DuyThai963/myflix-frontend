@@ -13,6 +13,8 @@ type Props = {
   initialTime?: number;
   movieData?: any;
   isWatchParty?: boolean;
+  serverName?: string;
+  isEmbed?: boolean;
 };
 
 export default function VideoPlayer(props: Props) {
@@ -36,7 +38,9 @@ export default function VideoPlayer(props: Props) {
     onFullscreenChange: props.onFullscreenChange,
     initialTime: props.initialTime || 0,
     movieData: props.movieData,
-    isWatchParty: props.isWatchParty || false
+    isWatchParty: props.isWatchParty || false,
+    serverName: props.serverName,
+    isEmbed: props.isEmbed
   });
 
   const formatTime = (timeInSeconds: number) => {
@@ -79,10 +83,20 @@ export default function VideoPlayer(props: Props) {
   const isEmbedPlayer = props.src && (props.src.includes("player.") || props.src.includes("/player/") || props.src.includes("embed") || props.src.includes("phimapi") || props.src.includes("ophim"));
 
   if (isEmbedPlayer) {
+    let embedSrc = props.src;
+    if (props.initialTime && props.initialTime > 0) {
+      const startSec = Math.floor(props.initialTime);
+      if (!embedSrc.includes("t=") && !embedSrc.includes("start=") && !embedSrc.includes("time=")) {
+        const sep = embedSrc.includes("?") ? "&" : "?";
+        embedSrc = `${embedSrc}${sep}t=${startSec}&start=${startSec}`;
+      }
+    }
+
     return (
       <div ref={playerContainerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
         <iframe
-          src={props.src}
+          key={`${embedSrc}-${Math.floor(props.initialTime || 0)}`}
+          src={embedSrc}
           className="w-full h-full border-0"
           allowFullScreen
           allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
@@ -92,7 +106,7 @@ export default function VideoPlayer(props: Props) {
   }
 
   return (
-    <div 
+    <div
       ref={playerContainerRef}
       onMouseMove={handleUserInteraction}
       onMouseLeave={() => !isDragging && isPlaying && setShowControls(false)}
@@ -147,7 +161,7 @@ export default function VideoPlayer(props: Props) {
         </div>
       </div>
 
-      <div 
+      <div
         onClick={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()} style={{ transform: "translateZ(999px)" }}
         className={`absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-black/40 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 pointer-events-none ${showControls ? "opacity-100 animate-in fade-in duration-200" : "opacity-0"}`}
       >
@@ -163,8 +177,8 @@ export default function VideoPlayer(props: Props) {
         <div onClick={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()} className="w-full space-y-4 pointer-events-auto cursor-default relative z-50">
           <div className="flex items-center gap-3 w-full group/timeline">
             <span className="text-zinc-400 text-xs font-medium tabular-nums min-w-[40px]">{formatTime(currentTime)}</span>
-            
-            <div 
+
+            <div
               ref={timelineRef}
               onClick={(e) => handleTimelineUpdate(e.clientX, e.clientY)}
               onMouseDown={() => setIsDragging(true)} onMouseUp={() => setIsDragging(false)}
@@ -208,7 +222,7 @@ export default function VideoPlayer(props: Props) {
                 )}
               </button>
             </div>
-            
+
             <div className="flex items-center gap-5 relative z-50">
               <button onClick={(e) => toggleFullscreen(e)} className="text-zinc-300 hover:text-white transition active:scale-90 cursor-pointer p-1 pointer-events-auto">
                 {isFullscreen ? (
