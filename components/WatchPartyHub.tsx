@@ -235,15 +235,20 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
                       
                       {searchResults.map((movie: any) => {
                         const rawImg = movie.thumb_url || movie.poster_url || "";
-                        const imgUrl = rawImg.startsWith('http') ? rawImg : rawImg ? `https://img.ophim.live/uploads/movies/${rawImg}` : "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png";
+                        const imgUrl = rawImg || "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png";
 
                         return (
                           <div 
                             key={movie._id || movie.slug}
                             onClick={() => {
                               setSelectedMovie({
-                                id: movie._id, slug: movie.slug, title: movie.name, origin_name: movie.origin_name,
-                                year: movie.year, episode_current: movie.episode_current, thumb_url: rawImg
+                                id: movie._id || movie.id || movie.slug,
+                                slug: movie.slug,
+                                title: movie.name || movie.title,
+                                origin_name: movie.origin_name || "",
+                                year: movie.year || 2026,
+                                episode_current: movie.episode_current || "Full",
+                                thumb_url: rawImg
                               });
                               setSearchResults([]);
                               setSearchQuery("");

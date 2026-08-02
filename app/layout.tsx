@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ZoomBlocker from "@/components/ZoomBlocker"; // IMPORT THẰNG NÀY VÀO
 import { Analytics } from "@vercel/analytics/next";
+import { AuthProvider } from "@/context/AuthContext";
+import NetflixAuthGate from "@/components/NetflixAuthGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,9 +53,13 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
       </head>
       <body className="min-h-full flex flex-col bg-black text-white selection:bg-red-600 selection:text-white">
-        <ZoomBlocker /> 
-        {children}
-        <Analytics />
+        <AuthProvider>
+          <NetflixAuthGate>
+            <ZoomBlocker /> 
+            {children}
+            <Analytics />
+          </NetflixAuthGate>
+        </AuthProvider>
       </body>
     </html>
   );

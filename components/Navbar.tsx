@@ -157,7 +157,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                         className="flex items-center gap-2 p-1.5 hover:bg-zinc-900 rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
                       >
                         <img 
-                          src={movie.thumb_url.startsWith('http') ? movie.thumb_url : `https://img.ophim.live/uploads/movies/${movie.thumb_url}`} 
+                          src={movie.thumb_url || "https://placehold.co/600x400/18181b/ffffff?text=No+Image"} 
                           alt={movie.name} 
                           className="w-7 aspect-[2/3] rounded object-cover flex-shrink-0" 
                         />
@@ -259,25 +259,6 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                 </Link>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL ĐĂNG NHẬP NETFLIX */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-in fade-in duration-200">
-          <div className="bg-black/95 border border-zinc-800 w-full max-w-md p-8 md:p-10 rounded-lg shadow-2xl relative animate-in zoom-in-95 duration-200 flex flex-col gap-6" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors text-lg">✕</button>
-            <h2 className="text-white text-2xl md:text-3xl font-bold">Sign In</h2>
-            <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-              {loginError && <div className="bg-orange-600/20 border border-orange-500 text-orange-400 text-xs px-3 py-2 rounded">{loginError}</div>}
-              <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-white rounded px-4 py-3 text-sm outline-none w-full focus:border-zinc-500 transition-colors placeholder-zinc-500" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-white rounded px-4 py-3 text-sm outline-none w-full focus:border-zinc-500 transition-colors placeholder-zinc-500" />
-              <button type="submit" disabled={isLoading} className="bg-red-600 hover:bg-red-700 font-semibold text-white rounded py-3 text-sm mt-4 transition-colors w-full active:scale-[0.98] disabled:bg-red-800 disabled:text-zinc-400">
-                {isLoading ? "Signing in..." : "Sign In"}
-              </button>
-            </form>
-            <p className="text-zinc-500 text-xs text-center mt-2">Chỉ tài khoản Admin được cấp phép mới có quyền truy cập hệ thống.</p>
           </div>
         </div>
       )}

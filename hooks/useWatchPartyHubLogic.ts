@@ -76,8 +76,10 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(searchQuery)}`);
         const resData = await response.json();
         
-        if (resData?.status === "success" && resData?.data?.items) {
+        if ((resData?.status || resData?.status === "success") && resData?.data?.items) {
           setSearchResults(resData.data.items);
+        } else if (Array.isArray(resData?.items)) {
+          setSearchResults(resData.items);
         } else {
           setSearchResults([]);
         }
@@ -113,9 +115,10 @@ export function useWatchPartyHubLogic(onJoinRoomClick?: (roomId: string) => void
         id: selectedMovie.id,
         slug: selectedMovie.slug,
         title: selectedMovie.title,
-        episode: "Tập 1", 
+        episode: selectedMovie.episode_current || "Tập 1", 
         episodeSlug: "full",
-        currentTime: 0    
+        serverName: selectedMovie.serverName || "Vietsub",
+        currentTime: typeof selectedMovie.currentTime === "number" ? selectedMovie.currentTime : 0    
       },
       hostUserId: user.id,
       hostUsername: user.username

@@ -4,7 +4,8 @@ import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useMovieModalLogic, formatEpName } from "@/hooks/useMovieModalLogic";
+import { useMovieModalLogic, formatEpName, getBestStreamUrl } from "@/hooks/useMovieModalLogic";
+import { socket } from "@/services/socket.service";
 
 type Props = {
   movie: Movie | null;
@@ -26,6 +27,8 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
     isPlayerFullscreen, setIsPlayerFullscreen,
     fullMovieDetail,
     hasNextEpisode,
+    isEmbedMode, setIsEmbedMode,
+    isHost,
     toggleMyList,
     handleProgress,
     handleNextEpisode,
@@ -48,9 +51,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
         >
           <div className="text-center space-y-4">
             <div className="w-12 h-12 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin mx-auto" />
-            <p className="text-sm font-bold text-zinc-400 tracking-wide animate-pulse">
-              📡 Đang kết nối hạ tầng và đồng bộ phòng xem chung...
-            </p>
+            <p className="text-sm font-semibold text-zinc-300 animate-pulse">Đang đồng bộ phòng xem chung...</p>
           </div>
         </motion.div>
       );
@@ -59,47 +60,34 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
   }
 
   return (
-    <motion.div
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm select-none overscroll-none"
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm select-none overflow-hidden"
     >
-      <motion.div
-        onClick={(e) => e.stopPropagation()}
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-zinc-950 rounded-xl overflow-hidden w-full max-w-5xl max-h-[95vh] flex flex-col relative border border-zinc-800 shadow-2xl"
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()} 
+        className="bg-[#141414] w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-lg overflow-hidden flex flex-col relative shadow-2xl border border-zinc-800"
       >
-        {!isPlayerFullscreen && (
-          <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose();
-            }}
-            style={{ zIndex: 2147483647 }} 
-            className="absolute top-4 right-4 bg-black/70 hover:bg-white text-white hover:text-black w-10 h-10 rounded-full transition flex items-center justify-center text-xl shadow-2xl border border-zinc-700/50 cursor-pointer pointer-events-auto"
-          >
-            ✕
-          </button>
-        )}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer"
+        >
+          ✕
+        </button>
 
-        {/* Trình phát Video Player */}
-        <div className="aspect-video bg-black w-full relative z-10">
-          {loading ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-zinc-700 border-t-red-600 rounded-full animate-spin" />
-            </div>
-          ) : streamUrl ? (
+        {/* Khối Trình phát Video (Custom HLS Player hoặc IFrame Embed Dự Phòng) */}
+        <div className="w-full aspect-video bg-black relative shrink-0">
+          {streamUrl ? (
             <VideoPlayer 
-              key={`${movie.id}-${activeEpisode}`} // 🎯 BẢO HIỂM 1: Đập nhịp re-render component con từ lớp cha
+              key={`${movie.id}-${activeEpisode}`}
               src={streamUrl} 
               movieId={`${movie.id}-${activeEpisode}`} 
               onProgress={handleProgress}
               isSeries={hasNextEpisode} 
               onNext={handleNextEpisode} 
-              initialTime={typeof movie.currentTime === 'number' ? Math.floor(movie.currentTime) : initialTime}
+              initialTime={isWatchParty && typeof initialTime === "number" && initialTime > 0 ? Math.floor(initialTime) : (typeof movie.currentTime === 'number' ? Math.floor(movie.currentTime) : initialTime)}
               onFullscreenChange={(isFullscreenNow) => setIsPlayerFullscreen(isFullscreenNow)}
               movieData={fullMovieDetail || movie}
               isWatchParty={isWatchParty} 
@@ -130,39 +118,121 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                 <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
               </div>
 
-              {/* Bộ chọn Server phát */}
-              {episodeData.length > 1 && (
-                <div className="flex gap-2 mb-6">
-                  {episodeData.map((server) => (
-                    <button 
-                      key={server.server_name} 
-                      onClick={() => {
-                        // 🎯 1. Lưu cứng lại thời gian hiện tại trước khi đổi server
-                        if (movie && latestTimeRef.current > 0) {
-                          movie.currentTime = latestTimeRef.current;
-                        }
+              {/* Bộ chọn Nguồn Phim (Vietsub / Lồng Tiếng) & Định dạng Trình phát (HLS / Embed) */}
+              <div className="space-y-3 mb-6">
+                {/* 1. Chọn Server Thuyết minh / Vietsub / Lồng tiếng */}
+                {episodeData.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-400 mr-1">Nguồn:</span>
+                    {episodeData.map((server) => (
+                      <button 
+                        key={server.server_name} 
+                        onClick={() => {
+                          if (movie && latestTimeRef.current > 0) {
+                            movie.currentTime = latestTimeRef.current;
+                          }
 
-                        setActiveServer(server.server_name);
-                        setEpisodes(server.server_data);
-                        
-                        // 🎯 2. Ánh xạ tìm lại tập tương ứng ở server mới
-                        let targetEp = server.server_data.find((ep: any) => ep.slug === activeEpisode);
-                        if (!targetEp) {
-                          targetEp = server.server_data[0]; // Rớt lại tập 1 nếu nguồn này không tồn tại tập bạn đang xem
-                          if (movie) movie.currentTime = 0; // Lệch số tập thì ép Player khởi động lại ở 0s
-                        }
+                          setActiveServer(server.server_name);
+                          setEpisodes(server.server_data);
+                          
+                          let targetEp = server.server_data.find((ep: any) => ep.slug === activeEpisode);
+                          if (!targetEp) {
+                            targetEp = server.server_data[0];
+                            if (movie) movie.currentTime = 0;
+                          }
 
-                        setStreamUrl(targetEp.link_m3u8 || targetEp.link_embed);
-                        setActiveEpisode(targetEp.slug);
-                        setActiveEpisodeName(formatEpName(targetEp.name));
-                      }} 
-                      className={`px-3 py-1 text-xs font-bold uppercase rounded border transition ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
-                    >
-                      {server.server_name}
-                    </button>
-                  ))}
+                          const urlToPlay = isEmbedMode ? (targetEp.link_embed || targetEp.link_m3u8) : (targetEp.link_m3u8 || targetEp.link_embed);
+                          setStreamUrl(urlToPlay);
+                          setActiveEpisode(targetEp.slug);
+                          setActiveEpisodeName(formatEpName(targetEp.name));
+
+                          const urlParams = new URLSearchParams(window.location.search);
+                          const roomId = urlParams.get("room");
+                          if (roomId && isHost) {
+                            const userString = localStorage.getItem("myflix_user");
+                            const user = userString ? JSON.parse(userString) : null;
+                            socket.emit("host_update_room_state", {
+                              roomId,
+                              hostUserId: user?.id,
+                              currentTime: latestTimeRef.current > 0 ? Math.floor(latestTimeRef.current) : 0,
+                              isPlaying: true,
+                              episodeSlug: targetEp.slug,
+                              episodeName: formatEpName(targetEp.name),
+                              serverName: server.server_name,
+                              isEmbedMode
+                            });
+                          }
+                        }} 
+                        className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                      >
+                        {server.server_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. Chọn Định Dạng Trình Phát (M3U8 HLS vs Embed Dự Phòng) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-400 mr-1">Player:</span>
+                  <button
+                    onClick={() => {
+                      setIsEmbedMode(false);
+                      const currentEp = episodes.find((ep: any) => ep.slug === activeEpisode) || episodes[0];
+                      if (currentEp && (currentEp.link_m3u8 || currentEp.link_embed)) {
+                        setStreamUrl(currentEp.link_m3u8 || currentEp.link_embed);
+                      }
+                      const urlParams = new URLSearchParams(window.location.search);
+                      const roomId = urlParams.get("room");
+                      if (roomId && isHost) {
+                        const userString = localStorage.getItem("myflix_user");
+                        const user = userString ? JSON.parse(userString) : null;
+                        socket.emit("host_update_room_state", {
+                          roomId,
+                          hostUserId: user?.id,
+                          currentTime: latestTimeRef.current,
+                          isPlaying: true,
+                          episodeSlug: activeEpisode,
+                          episodeName: activeEpisodeName,
+                          serverName: activeServer,
+                          isEmbedMode: false
+                        });
+                      }
+                    }}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${!isEmbedMode ? "bg-red-600/90 border-red-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
+                  >
+                    M3U8 HLS (Server 1)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsEmbedMode(true);
+                      const currentEp = episodes.find((ep: any) => ep.slug === activeEpisode) || episodes[0];
+                      if (currentEp && (currentEp.link_embed || currentEp.link_m3u8)) {
+                        setStreamUrl(currentEp.link_embed || currentEp.link_m3u8);
+                      }
+                      const urlParams = new URLSearchParams(window.location.search);
+                      const roomId = urlParams.get("room");
+                      if (roomId && isHost) {
+                        const userString = localStorage.getItem("myflix_user");
+                        const user = userString ? JSON.parse(userString) : null;
+                        socket.emit("host_update_room_state", {
+                          roomId,
+                          hostUserId: user?.id,
+                          currentTime: latestTimeRef.current,
+                          isPlaying: true,
+                          episodeSlug: activeEpisode,
+                          episodeName: activeEpisodeName,
+                          serverName: activeServer,
+                          isEmbedMode: true
+                        });
+                      }
+                    }}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${isEmbedMode ? "bg-amber-600 border-amber-500 text-white font-black" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
+                  >
+                    EMBED (Server 2)
+                  </button>
                 </div>
-              )}
+              </div>
 
               {/* Nút lưu phim cá nhân */}
               <div className="mb-6 flex items-center gap-4">
@@ -200,19 +270,19 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   {episodes.map((ep, idx) => {
-                    const isPlayable = ep.link_m3u8 && ep.link_m3u8.trim() !== "";
+                    const urlToPlay = isEmbedMode ? (ep.link_embed || ep.link_m3u8) : (ep.link_m3u8 || ep.link_embed);
+                    const isPlayable = Boolean(urlToPlay);
                     return (
                       <button
                         key={idx}
                         disabled={!isPlayable}
                         onClick={() => {
-                          if (ep.link_m3u8 || ep.link_embed) {
+                          if (urlToPlay) {
                             if (movie) {
-                              // ❌ KHÔNG GHI ĐÈ movie.episode_current Ở ĐÂY NỮA, BẢO TOÀN TRẠNG THÁI GỐC
                               movie.watchId_db = `${movie.id}-${ep.slug}`;
                               movie.currentTime = 0;
                             }
-                            setStreamUrl(ep.link_m3u8 || ep.link_embed);
+                            setStreamUrl(urlToPlay);
                             setActiveEpisode(ep.slug);
                             setActiveEpisodeName(formatEpName(ep.name));
                           } else {

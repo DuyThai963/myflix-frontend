@@ -22,4 +22,13 @@ export interface Movie {
   episodes?: Episode[];
   episode_current: string;
   episode_total: string;
+  currentTime?: number;
+  watchId_db?: string;
+  serverName?: string;
+  isEmbedMode?: boolean;
+  isHost?: boolean;
+  hostUserId?: string | number;
+  origin_name?: string;
+  thumb_url?: string;
+  poster_url?: string;
 }

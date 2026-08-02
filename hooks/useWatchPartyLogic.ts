@@ -17,18 +17,21 @@ export function useWatchPartyLogic() {
     const handleSyncInitialTime = ({ currentTime }: { currentTime: number }) => {
       setInitialTime(currentTime);
     };
-    socket.on("sync_initial_time_to_guest", handleSyncInitialTime);
 
     // Lắng nghe trạng thái phòng để bung Modal Player xem chung
-    socket.on("room_state", (roomData) => {
+    const handleRoomState = (roomData: any) => {
       if (roomData?.movieState?.slug) {
         setSelectedMovie({
           id: roomData.movieState.id || roomData.roomId, // 🎯 Bổ sung ID chuẩn để Modal parse ra đúng tập
           slug: roomData.movieState.slug,
           title: roomData.movieState.title,
+          serverName: roomData.movieState.serverName || "Vietsub",
+          isEmbedMode: Boolean(roomData.movieState.isEmbedMode),
+          isHost: Boolean(roomData.isHost),
+          hostUserId: roomData.hostUserId,
           watchId_db: roomData.movieState.episodeSlug ? `${roomData.movieState.id || roomData.roomId}-${roomData.movieState.episodeSlug}` : undefined,
           currentTime: roomData.movieState.currentTime || 0,
-          origin_name: "", thumb_url: "", poster_url: "", banner: "", stream: "",
+          origin_name: "", thumb_url: "", poster_url: "", poster: "", banner: "", stream: "",
           description: "", year: 2026, duration: "", genre: "", country: "",
           episode_current: roomData.movieState.episode || "Tập 1",
           episode_total: "1"
@@ -36,27 +39,32 @@ export function useWatchPartyLogic() {
         // 🎯 Gắn lại thời gian từ DB Redis để phát tiếp ngay mốc đã lưu
         setInitialTime(roomData.movieState.currentTime || 0);
       }
-    });
+    };
 
-    socket.on("room_error", (error) => {
+    const handleRoomError = (error: any) => {
       alert(`⚠️ Lỗi phòng: ${error.message}`);
       setSelectedMovie(null);
       setCurrentRoomId(null);
       window.history.pushState({}, "", window.location.pathname);
-    });
+    };
 
-    socket.on("room_deleted_by_host", () => {
+    const handleRoomDeleted = () => {
       alert("Chủ phòng đã đóng phòng này vĩnh viễn!");
       setSelectedMovie(null);
       setCurrentRoomId(null);
       window.history.pushState({}, "", window.location.pathname);
-    });
+    };
+
+    socket.on("sync_initial_time_to_guest", handleSyncInitialTime);
+    socket.on("room_state", handleRoomState);
+    socket.on("room_error", handleRoomError);
+    socket.on("room_deleted_by_host", handleRoomDeleted);
 
     return () => {
       socket.off("sync_initial_time_to_guest", handleSyncInitialTime);
-      socket.off("room_state");
-      socket.off("room_error");
-      socket.off("room_deleted_by_host");
+      socket.off("room_state", handleRoomState);
+      socket.off("room_error", handleRoomError);
+      socket.off("room_deleted_by_host", handleRoomDeleted);
     };
   }, []);
 

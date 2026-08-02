@@ -77,6 +77,8 @@ export function useVideoPlayerLogic({
     if (timeToSave <= 0 && !isEnding) return;
     if (isWatchPartyRef.current === true || isWatchParty === true) return;
 
+    if (isWatchPartyRef.current || isWatchParty) return; // 🛡️ CHỈ LƯU REDIS KHI XEM CHUNG, CẤM LƯU VÀO HISTORY DB / LOCALSTORAGE
+
     const token = localStorage.getItem("myflix_token");
     const userString = localStorage.getItem("myflix_user");
     
@@ -98,6 +100,11 @@ export function useVideoPlayerLogic({
     const finalWatchId = (currentEpisodeSlug !== "full") ? `${cleanMovieId}-${currentEpisodeSlug}` : cleanMovieId;
     // -----------------------------------------------------
 
+    const targetId = movieData?.id || movieData?._id || cleanMovieId;
+    const targetPoster = movieData?.poster || movieData?.poster_url || movieData?.thumb_url || "";
+    const targetThumb = movieData?.thumb_url || movieData?.poster_url || movieData?.poster || "";
+    const targetTitle = movieData?.title || movieData?.name || movieTitle;
+
     const historyItem = {
       watchId: finalWatchId, 
       episodeSlug: currentEpisodeSlug,
@@ -105,17 +112,21 @@ export function useVideoPlayerLogic({
       currentTime: isEnding ? 0 : Math.floor(timeToSave),
       updatedAt: new Date().toISOString(),
       movie: {
-        id: movieData?.id || cleanMovieId,
+        id: targetId,
+        _id: targetId,
         slug: movieData?.slug || cleanMovieId,
-        title: movieData?.title || movieTitle,
-        description: movieData?.description || "",
-        poster: movieData?.poster || "",
-        banner: movieData?.banner || movieData?.poster || "",
+        title: targetTitle,
+        name: targetTitle,
+        description: movieData?.description || movieData?.content || "",
+        poster: targetPoster,
+        poster_url: targetPoster,
+        thumb_url: targetThumb,
+        banner: movieData?.banner || targetPoster,
         year: movieData?.year || 2026,
-        duration: movieData?.duration || "",
-        country: movieData?.country || "",
-        genre: movieData?.genre || "",
-        episode_current: originalEpCurrent // Giữ nguyên "Tập 16" cho Card ngoài Home hiển thị
+        duration: movieData?.duration || movieData?.time || "",
+        country: typeof movieData?.country === "string" ? movieData.country : (movieData?.country?.[0]?.name || ""),
+        genre: typeof movieData?.genre === "string" ? movieData.genre : (movieData?.category?.[0]?.name || ""),
+        episode_current: originalEpCurrent
       }
     };
 
@@ -576,6 +587,15 @@ export function useVideoPlayerLogic({
       }
     }
   }, [src, movieId, movieData]);
+
+  // 🛡️ ĐỒNG BỘ LỊCH SỬ XEM KHI CHẠY Ở CHẾ ĐỘ PLAYER EMBED (DỰ PHÒNG)
+  useEffect(() => {
+    const isEmbedPlayer = src && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("phimapi") || src.includes("ophim"));
+    if (isEmbedPlayer) {
+      setLoading(false);
+      saveWatchingProgress(initialTime || 0);
+    }
+  }, [src, movieId]);
 
   // Luồng Polling Sync phòng xem chung
   useEffect(() => {

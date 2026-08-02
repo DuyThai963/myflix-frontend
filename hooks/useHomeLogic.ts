@@ -10,69 +10,31 @@ export function useHomeLogic() {
   const [keyword, setKeyword] = useState("");
   const [continueWatching, setContinueWatching] = useState<Movie[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [phimBo, setPhimBo] = useState<Movie[]>([]);
+  const [phimLe, setPhimLe] = useState<Movie[]>([]);
+  const [hoatHinh, setHoatHinh] = useState<Movie[]>([]);
+  const [tvShows, setTvShows] = useState<Movie[]>([]);
   const [isIntroLoading, setIsIntroLoading] = useState(true);
   const [mountIntro, setMountIntro] = useState(false);
   const [isMoviesLoading, setIsMoviesLoading] = useState(true);
 
-  // 🔌 1. LUỒNG REALTIME SOCKET (WATCH PARTY)
-  useEffect(() => {
-    socket.connect();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get("room");
-
-    if (!roomId) {
-      setSelectedMovie(null);
-      return;
-    }
-
-    const userString = localStorage.getItem("myflix_user");
-    const user = userString ? JSON.parse(userString) : null;
-    const userName = user?.username || `ChiếnHữu_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const userId = user?.id || null;
-    const hostToken = localStorage.getItem(`host_token_${roomId}`) || null;
-
-    socket.emit("join_room", { roomId, userName, userId, hostToken });
-
-    const handleRoomState = (data: any) => {
-      if (data?.movieState?.slug) {
-        setSelectedMovie({
-          id: data.movieState.id || data.roomId,
-          slug: data.movieState.slug,
-          title: data.movieState.title,
-          watchId_db: data.movieState.episodeSlug ? `${data.movieState.id || data.roomId}-${data.movieState.episodeSlug}` : undefined,
-          currentTime: data.movieState.currentTime || 0,
-          episode_current: data.movieState.episode || "Tập 1",
-          origin_name: "", thumb_url: "", poster_url: "",
-          year: 2026, duration: "", genre: "", country: "", description: ""
-        });
-      }
-    };
-
-    const handleRoomError = (err: any) => {
-      alert(`⚠️ Lỗi phòng: ${err.message}`);
-      window.location.href = "/";
-    };
-
-    socket.on("room_state", handleRoomState);
-    socket.on("room_error", handleRoomError);
-
-    return () => {
-      socket.off("room_state", handleRoomState);
-      socket.off("room_error", handleRoomError);
-    };
-  }, []);
-
-  // 🎬 2. LUỒNG FETCH DANH SÁCH PHIM TRANG CHỦ
+  // 🎬 2. LUỒNG FETCH SONG SONG CÁC DANH MỤC PHIM TRANG CHỦ
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const data = await movieService.getMovies();
-        if (data && Array.isArray(data)) {
-          setMovies(data);
-        } else {
-          console.warn("⚠️ [Home Logic API] Dữ liệu trả về không phải là mảng cấu trúc phim hợp lệ:", data);
-        }
+        const [homeRes, boRes, leRes, hhRes, tvRes] = await Promise.allSettled([
+          movieService.getMovies(),
+          movieService.getMoviesByCategory("phim-bo"),
+          movieService.getMoviesByCategory("phim-le"),
+          movieService.getMoviesByCategory("hoat-hinh"),
+          movieService.getMoviesByCategory("tv-shows")
+        ]);
+
+        if (homeRes.status === "fulfilled" && Array.isArray(homeRes.value)) setMovies(homeRes.value);
+        if (boRes.status === "fulfilled" && Array.isArray(boRes.value)) setPhimBo(boRes.value);
+        if (leRes.status === "fulfilled" && Array.isArray(leRes.value)) setPhimLe(leRes.value);
+        if (hhRes.status === "fulfilled" && Array.isArray(hhRes.value)) setHoatHinh(hhRes.value);
+        if (tvRes.status === "fulfilled" && Array.isArray(tvRes.value)) setTvShows(tvRes.value);
       } catch (error) {
         console.error("Lỗi fetch movies trang chủ:", error);
       } finally {
@@ -124,6 +86,7 @@ export function useHomeLogic() {
           
           if (res.ok) {
             const dbData = await res.json();
+            console.log("📺 [FE Home History] User Logged In -> Raw DB history from Neon:", dbData);
             
             if (!dbData || dbData.length === 0) {
               sessionStorage.removeItem("myflix_db_history");
@@ -138,26 +101,31 @@ export function useHomeLogic() {
             const uniqueMoviesMap = new Map();
             dbData.forEach((item: any) => {
               const movieObj = item.movie ? { ...item.movie } : null; 
-              if (movieObj && movieObj.id && !uniqueMoviesMap.has(movieObj.id)) {
+              const movieId = movieObj ? (movieObj.id || movieObj._id || movieObj.slug || item.watchId || item.watch_id) : (item.watchId || item.watch_id);
+
+              if (movieObj && movieId && !uniqueMoviesMap.has(movieId)) {
+                movieObj.id = movieId;
                 
                 // 🎯 TÁI TẠO LẠI watchId_db CHỨA SỐ TẬP ĐỂ MODAL BIẾT ĐƯỜNG MỞ ĐÚNG TẬP XEM DỞ
-                const baseId = item.watchId || item.watch_id;
+                const baseId = item.watchId || item.watch_id || movieId;
                 const epSlug = item.episodeSlug || item.episode_slug;
                 movieObj.watchId_db = (epSlug && epSlug !== "full") ? `${baseId}-${epSlug}` : baseId;
                 
                 // Lấy watched_time từ DB map ngược vào biến currentTime cho Modal đọc
-                movieObj.currentTime = item.currentTime || item.watched_time; 
+                movieObj.currentTime = typeof item.currentTime === "number" ? item.currentTime : parseFloat(item.watched_time || 0); 
 
                 // 🛡️ Đồng bộ tên phim và trường ảnh để né lỗi "No Image" ngoài trang chủ
                 movieObj.title = movieObj.title || movieObj.name;
+                movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
-                uniqueMoviesMap.set(movieObj.id, movieObj);
+                uniqueMoviesMap.set(movieId, movieObj);
               }
             });
             
             const finalHistoryList = Array.from(uniqueMoviesMap.values());
+            console.log("✅ [FE Home History SUCCESS] Processed Continue Watching List:", finalHistoryList);
             setContinueWatching(finalHistoryList);
             return;
           }
@@ -171,18 +139,22 @@ export function useHomeLogic() {
             
             parsedHistory.forEach((item: any) => {
               const movieObj = item.movie ? { ...item.movie } : null;
-              if (movieObj && movieObj.id && !uniqueMoviesMap.has(movieObj.id)) {
+              const movieId = movieObj ? (movieObj.id || movieObj._id || movieObj.slug || item.watchId) : item.watchId;
+
+              if (movieObj && movieId && !uniqueMoviesMap.has(movieId)) {
+                movieObj.id = movieId;
                 const baseId = item.watchId && item.watchId.includes("-") ? item.watchId.split("-")[0] : item.watchId;
                 const epSlug = item.episodeSlug;
                 movieObj.watchId_db = (epSlug && epSlug !== "full") ? `${baseId}-${epSlug}` : item.watchId;
-                movieObj.currentTime = item.currentTime;
+                movieObj.currentTime = typeof item.currentTime === "number" ? item.currentTime : 0;
 
                 // 🛡️ Đồng bộ tên phim và trường ảnh cho luồng Guest
                 movieObj.title = movieObj.title || movieObj.name;
+                movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
-                uniqueMoviesMap.set(movieObj.id, movieObj);
+                uniqueMoviesMap.set(movieId, movieObj);
               }
             });
             const finalHistoryList = Array.from(uniqueMoviesMap.values());
@@ -241,19 +213,28 @@ export function useHomeLogic() {
     }
   };
 
-  // 🗂️ 6. LUỒNG PHÂN CHIA DANH MỤC PHIM (DÙNG USEMEMO TỐI ƯU SẠCH RE-RENDER)
+  // 🗂️ 6. LUỒNG PHÂN CHIA DANH MỤC PHIM PHONG PHÚ (DÙNG USEMEMO TỐI ƯU SẠCH RE-RENDER)
   const movieSections = useMemo(() => {
-    if (movies.length === 0) return [];
+    const sections = [];
 
-    return [
-      { title: "Trending Now", movies: movies.slice(0, 10) },
-      { title: "Phim Trung Quốc", movies: movies.filter((m) => m.country === "Trung Quốc") },
-      { title: "Phim Hàn Quốc", movies: movies.filter((m) => m.country === "Hàn Quốc") },
-      { title: "Hành động", movies: movies.filter((m) => m.genre === "Hành động") },
-      { title: "Chính kịch", movies: movies.filter((m) => m.genre === "Chính kịch") },
-      { title: "Âu Mỹ", movies: movies.filter((m) => m.country === "Âu Mỹ") },
-    ].filter((section) => section.movies.length > 0);
-  }, [movies]);
+    if (movies.length > 0) {
+      sections.push({ title: "Trending Now (Phim Mới Cập Nhật)", movies });
+    }
+    if (phimBo.length > 0) {
+      sections.push({ title: "Phim Bộ Đặc Sắc", movies: phimBo });
+    }
+    if (phimLe.length > 0) {
+      sections.push({ title: "Phim Lẻ Chiếu Rạp", movies: phimLe });
+    }
+    if (hoatHinh.length > 0) {
+      sections.push({ title: "Hoạt Hình & Anime", movies: hoatHinh });
+    }
+    if (tvShows.length > 0) {
+      sections.push({ title: "TV Shows & Truyền Hình", movies: tvShows });
+    }
+
+    return sections;
+  }, [movies, phimBo, phimLe, hoatHinh, tvShows]);
 
   return {
     selectedMovie, setSelectedMovie,

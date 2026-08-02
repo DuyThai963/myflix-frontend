@@ -76,6 +76,21 @@ export default function VideoPlayer(props: Props) {
     }
   };
 
+  const isEmbedPlayer = props.src && (props.src.includes("player.") || props.src.includes("/player/") || props.src.includes("embed") || props.src.includes("phimapi") || props.src.includes("ophim"));
+
+  if (isEmbedPlayer) {
+    return (
+      <div ref={playerContainerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+        <iframe
+          src={props.src}
+          className="w-full h-full border-0"
+          allowFullScreen
+          allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+        />
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={playerContainerRef}

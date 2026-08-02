@@ -19,18 +19,18 @@ export default function MoviesPage() {
   const fetchMovies = async (pageNum: number) => {
     setLoading(true);
     try {
-      // Ở đây ta gọi API danh-sach/phim-le vì đây là trang Movies
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/danh-sach/phim-le?page=${pageNum}`);
+      // Gọi qua proxy backend để lấy danh sách phim, không gọi trực tiếp OPhim
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/home?page=${pageNum}`);
       const data = await response.json();
       
-      if (data?.data?.items && data.data.items.length > 0) {
-        // Map data sang chuẩn Movie của mình (dùng hàm helper getImageUrl đã viết ở service)
-        // Lưu ý: Để nhanh tôi fetch trực tiếp, nhưng bạn nên dùng movieService.getMoviesByCategory cho sạch
-        const newMovies = data.data.items.map((m: any) => ({
-          id: m._id,
+      const items = data?.data?.items || data?.items || [];
+      
+      if (items.length > 0) {
+        const newMovies = items.map((m: any) => ({
+          id: m._id || m.id || m.slug,
           slug: m.slug,
-          title: m.name,
-          poster: `https://img.ophim.live/uploads/movies/${m.thumb_url}`,
+          title: m.name || m.title,
+          poster: m.poster_url || m.thumb_url,
           year: m.year,
           genre: m.category?.[0]?.name || "Phim lẻ"
         }));
@@ -38,7 +38,7 @@ export default function MoviesPage() {
         // Cộng dồn phim mới vào danh sách cũ
         setMovies(prev => pageNum === 1 ? newMovies : [...prev, ...newMovies]);
         
-        // Nếu số lượng trả về ít hơn 20 (hoặc số lượng mặc định) thì có thể đã hết phim
+        // Nếu số lượng trả về ít hơn 10 thì có thể đã hết phim
         if (newMovies.length < 10) setHasMore(false);
       } else {
         setHasMore(false);
