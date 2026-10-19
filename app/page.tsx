@@ -41,7 +41,7 @@ export default function Home() {
           </>
         ) : (
           <>
-            {movies.length > 0 && <HeroBanner movie={movies[0]} />}
+            {movies.length > 0 && <HeroBanner movie={movies[0]} onSelectMovie={setSelectedMovie} />}
 
             <div className="-mt-24 relative z-20">
               {continueWatching.length > 0 && (

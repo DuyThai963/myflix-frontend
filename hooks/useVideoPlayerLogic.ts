@@ -542,7 +542,7 @@ export function useVideoPlayerLogic({
         setDuration(video.duration);
         video.currentTime = savedTime;
 
-        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho iOS/Safari - Server 1 M3U8)
+        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho iOS/Safari - Server 2 M3U8)
         if (isWatchPartyRef.current === true || isWatchParty === true) {
           const roomId = roomIdRef.current;
           if (roomId) socket.emit("guest_ready_to_sync", { roomId });
@@ -566,7 +566,7 @@ export function useVideoPlayerLogic({
         setDuration(video.duration);
         video.currentTime = savedTime;
 
-        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho Chrome/PC - Server 1 M3U8)
+        // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho Chrome/PC - Server 2 M3U8)
         if (isWatchPartyRef.current === true || isWatchParty === true) {
           const roomId = roomIdRef.current;
           if (roomId) socket.emit("guest_ready_to_sync", { roomId });
@@ -596,14 +596,14 @@ export function useVideoPlayerLogic({
     }
   }, [src, movieId, movieData]);
 
-  // 🛡️ ĐỒNG BỘ LỊCH SỬ XEM VÀ WATCH PARTY KHỈ CHẠY Ở CHẾ ĐỘ PLAYER EMBED (SERVER 2)
+  // 🛡️ ĐỒNG BỘ LỊCH SỬ XEM VÀ WATCH PARTY KHỈ CHẠY Ở CHẾ ĐỘ PLAYER EMBED (SERVER 1)
   useEffect(() => {
     const isEmbedPlayer = src && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("phimapi") || src.includes("ophim"));
     if (isEmbedPlayer) {
       setLoading(false);
       saveWatchingProgress(initialTime || 0);
 
-      // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho Server 2 EMBED)
+      // 📡 BÁO CÁO HOÀN TẤT LOAD, XIN GIỜ CHUẨN TỪ HOST (Dành cho Server 1 EMBED)
       if (isWatchPartyRef.current === true || isWatchParty === true) {
         const roomId = roomIdRef.current;
         if (roomId) socket.emit("guest_ready_to_sync", { roomId });
@@ -614,28 +614,30 @@ export function useVideoPlayerLogic({
   // Luồng Polling Sync phòng xem chung
   useEffect(() => {
     if (initialTime <= 0 || !src) return;
-    const sessionKey = `${movieId}-${initialTime}`;
+    const sessionKey = String(movieId);
     if (hasSyncedInitialTimeRef.current === sessionKey) return;
+    hasSyncedInitialTimeRef.current = sessionKey;
 
     const video = videoRef.current;
+    if (!video) return;
+
     let attempts = 0;
     const seekPolling = setInterval(() => {
       attempts++;
       if (video && video.readyState >= 1) {
         if (Math.abs(video.currentTime - initialTime) > 0.5 && attempts <= 20) {
-          video.pause(); setIsPlaying(false);
-          video.currentTime = initialTime; setCurrentTime(initialTime);
+          video.currentTime = initialTime;
+          setCurrentTime(initialTime);
         } else {
-          hasSyncedInitialTimeRef.current = sessionKey; clearInterval(seekPolling);
-          video.play().then(() => setIsPlaying(true)).catch(() => {
-            video.muted = true; setIsMuted(true);
-            video.play().then(() => setIsPlaying(true));
-          });
+          clearInterval(seekPolling);
         }
-      } else if (attempts > 20) clearInterval(seekPolling);
+      } else if (attempts > 20) {
+        clearInterval(seekPolling);
+      }
     }, 400);
+
     return () => clearInterval(seekPolling);
-  }, [initialTime, src, movieId]);
+  }, [src, movieId]);
 
   // 🎯 LUỒNG HARD SYNC: ACTION TỪ HOST (PLAY/PAUSE/SEEK) ĐỂ TRẢ LỜI NGAY TỨC THÌ (< 0.5s)
   useEffect(() => {
@@ -663,7 +665,9 @@ export function useVideoPlayerLogic({
     };
 
     socket.on("sync_action_from_host", handleSyncAction);
-    return () => socket.off("sync_action_from_host", handleSyncAction);
+    return () => {
+      socket.off("sync_action_from_host", handleSyncAction);
+    };
   }, [isWatchParty]);
 
   // 🎯 LUỒNG SOFT SYNC: HEARTBEAT ĐỂ NẮN CHỈNH KHI BỊ TRÔI SAU VÀI GIÂY ỔN ĐỊNH
@@ -683,7 +687,9 @@ export function useVideoPlayerLogic({
     };
 
     socket.on("soft_sync_from_host", handleSoftSync);
-    return () => socket.off("soft_sync_from_host", handleSoftSync);
+    return () => {
+      socket.off("soft_sync_from_host", handleSoftSync);
+    };
   }, [isWatchParty]);
 
   useEffect(() => {

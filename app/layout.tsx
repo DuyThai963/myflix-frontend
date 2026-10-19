@@ -31,6 +31,7 @@ export const metadata: Metadata = {
   title: "DT MyFlix",
   description: "Personal Streaming App by Duy Thái",
   manifest: "/manifest.json",
+  referrer: "no-referrer",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent", 
@@ -51,6 +52,7 @@ export default function RootLayout({
     >
       <head>
         <meta name="theme-color" content="#000000" />
+        <meta name="referrer" content="no-referrer" />
       </head>
       <body className="min-h-full flex flex-col bg-black text-white selection:bg-red-600 selection:text-white">
         <AuthProvider>

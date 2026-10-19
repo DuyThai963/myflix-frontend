@@ -28,7 +28,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
   const [isInMyList, setIsInMyList] = useState(false);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const [fullMovieDetail, setFullMovieDetail] = useState<any>(null);
-  const [isEmbedMode, setIsEmbedMode] = useState<boolean>(false);
+  const [isEmbedMode, setIsEmbedMode] = useState<boolean>(true);
 
   const latestTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
@@ -303,7 +303,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
 
             let foundHistorySlug: string | null = null;
             let foundServerName: string | null = null;
-            let foundIsEmbed: boolean = false;
+            let foundIsEmbed: boolean | null = null;
             if (!isWatchPartyActive) {
               try {
                 // Check Guest
@@ -311,7 +311,10 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
                 if (localHist) {
                   const histArr = JSON.parse(localHist);
                   const found = histArr.find((h: any) => String(h.movie?.id || h.movie?._id || h.watchId).startsWith(targetMovieId));
-                  if (found) foundHistorySlug = found.episodeSlug || found.episodeslug;
+                  if (found) {
+                    foundHistorySlug = found.episodeSlug || found.episodeslug;
+                    foundIsEmbed = found.isEmbed !== undefined ? found.isEmbed === true : null;
+                  }
                 }
                 // Check User Logged In
                 if (!foundHistorySlug) {
@@ -322,7 +325,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
                     if (found) {
                       foundHistorySlug = found.episodeSlug || found.episodeslug;
                       foundServerName = found.serverName || null;
-                      foundIsEmbed = found.isEmbed === true;
+                      foundIsEmbed = found.isEmbed !== undefined ? found.isEmbed === true : null;
                     }
                   }
                 }
@@ -359,7 +362,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
               }
             }
 
-            const targetEmbedMode = foundIsEmbed || Boolean((movie as any)?.isEmbedMode);
+            const targetEmbedMode = foundIsEmbed !== null ? foundIsEmbed : ((movie as any)?.isEmbedMode !== undefined ? Boolean((movie as any).isEmbedMode) : true);
             setIsEmbedMode(targetEmbedMode);
 
             const targetUrl = targetEmbedMode 

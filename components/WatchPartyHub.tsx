@@ -235,7 +235,7 @@ export default function WatchPartyHub({ onJoinRoomClick }: HubProps) {
                       
                       {searchResults.map((movie: any) => {
                         const rawImg = movie.thumb_url || movie.poster_url || "";
-                        const imgUrl = rawImg || "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png";
+                        const imgUrl = rawImg || "/avatar.png";
 
                         return (
                           <div 

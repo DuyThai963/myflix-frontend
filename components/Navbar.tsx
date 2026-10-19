@@ -214,7 +214,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                 onClick={() => setShowUserDropdown(!showUserDropdown)} 
                 className="w-8 h-8 rounded overflow-hidden cursor-pointer border border-transparent hover:border-white transition-all active:scale-90 flex-shrink-0"
               >
-                <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" className="w-full h-full object-cover" alt="Avatar" />
+                <img src="/avatar.png" className="w-full h-full object-cover" alt="Avatar" />
               </div>
 
               {showUserDropdown && (

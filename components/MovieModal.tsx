@@ -36,6 +36,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
   } = useMovieModalLogic(movie, onClose);
 
   const [isRoom, setIsRoom] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     setIsRoom(new URLSearchParams(window.location.search).has("room"));
@@ -63,23 +64,50 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
     <motion.div 
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm select-none overflow-hidden"
+      className={`fixed inset-0 z-50 flex items-center justify-center select-none overflow-hidden transition-all duration-300 ${isMaximized ? "bg-black p-0" : "bg-black/80 p-0 md:p-4 backdrop-blur-sm"}`}
     >
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()} 
-        className="bg-[#141414] w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-lg overflow-hidden flex flex-col relative shadow-2xl border border-zinc-800"
+        className={`bg-[#141414] w-full h-full overflow-hidden flex flex-col relative shadow-2xl transition-all duration-300 ${isMaximized ? "rounded-none border-none max-w-none" : "md:h-[90vh] md:max-w-5xl md:rounded-lg border border-zinc-800"}`}
       >
-        <button 
-          onClick={onClose}
-          className="absolute right-4 z-50 bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer"
+        <div 
+          className="absolute right-4 z-50 flex items-center gap-2"
           style={{ top: 'max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.5rem))' }}
         >
-          ✕
-        </button>
+          <button 
+            onClick={() => setIsMaximized(!isMaximized)}
+            title={isMaximized ? "Thu nhỏ về cửa sổ" : "Mở rộng vừa khung hình (Chế độ rạp chiếu)"}
+            className="bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400"
+          >
+            {isMaximized ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <polyline points="4 14 10 14 10 20" />
+                <polyline points="20 10 14 10 14 4" />
+                <line x1="14" y1="10" x2="21" y2="3" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            )}
+          </button>
+
+          <button 
+            onClick={onClose}
+            title="Đóng"
+            className="bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400"
+          >
+            ✕
+          </button>
+        </div>
 
         {/* Khối Trình phát Video (Custom HLS Player hoặc IFrame Embed Dự Phòng) */}
-        <div className="w-full bg-black relative shrink-0 overflow-hidden h-[38vh] sm:h-[42vh] md:h-[48vh] lg:h-[52vh]">
+        <div className={`w-full bg-black relative shrink-0 overflow-hidden transition-all duration-300 ${isMaximized ? "h-[80vh] sm:h-[84vh] md:h-[88vh] lg:h-[90vh]" : "h-[38vh] sm:h-[42vh] md:h-[48vh] lg:h-[52vh]"}`}>
           {streamUrl ? (
             <VideoPlayer 
               key={`${movie.id}-${activeEpisode}`}
@@ -103,26 +131,26 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
           )}
         </div>
 
-        {/* Khối hiển thị thông tin chi tiết phim */}
+        {/* Khối hiển thị thông tin chi tiết phim (Thu gọn khi isMaximized) */}
         <div 
-          className="p-6 md:p-8 overflow-y-auto z-0 flex-1 overscroll-contain"
+          className={`${isMaximized ? "p-4 md:p-6" : "p-6 md:p-8"} overflow-y-auto z-0 flex-1 overscroll-contain transition-all duration-300`}
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <div className="flex flex-col md:flex-row justify-between gap-8">
+          <div className="flex flex-col md:flex-row justify-between gap-6 md:gap-8">
             <div className="flex-1">
-              <h1 className="text-2xl md:text-4xl font-bold mb-3 text-white leading-tight">
+              <h1 className={`${isMaximized ? "text-xl md:text-2xl mb-2" : "text-2xl md:text-4xl mb-3"} font-bold text-white leading-tight`}>
                 {movie.title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-4 text-sm font-medium mb-6">
+              <div className={`flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm font-medium ${isMaximized ? "mb-3" : "mb-6"}`}>
                 <span className="text-green-500 font-bold">{movie.year}</span>
                 <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{movie.duration}</span>
                 <span className="text-zinc-400">{movie.genre}</span>
-                <span className="text-zinc-400 border-l border-zinc-700 pl-4">{movie.country}</span>
+                <span className="text-zinc-400 border-l border-zinc-700 pl-3 md:pl-4">{movie.country}</span>
               </div>
 
               {/* Bộ chọn Nguồn Phim (Vietsub / Lồng Tiếng) & Định dạng Trình phát (HLS / Embed) */}
-              <div className="space-y-3 mb-6">
+              <div className={`space-y-2.5 ${isMaximized ? "mb-3" : "mb-6"}`}>
                 {/* 1. Chọn Server Thuyết minh / Vietsub / Lồng tiếng */}
                 {episodeData.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
@@ -189,52 +217,11 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                   </div>
                 )}
 
-                {/* 2. Chọn Định Dạng Trình Phát (M3U8 HLS vs Embed Dự Phòng) */}
+                {/* 2. Chọn Định Dạng Trình Phát (Embed Server 1 vs M3U8 Server 2) */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-bold text-zinc-400 mr-1">Player:</span>
-                  <button
-                    onClick={() => {
-                      setIsEmbedMode(false);
-                      const currentEp = episodes.find((ep: any) => ep.slug === activeEpisode) || episodes[0];
-                      if (currentEp && (currentEp.link_m3u8 || currentEp.link_embed)) {
-                        setStreamUrl(currentEp.link_m3u8 || currentEp.link_embed);
-                      }
-                      // 💾 Lưu chế độ m3u8 lên DB (chỉ xém cá nhân)
-                      const urlParamsCheckM = new URLSearchParams(window.location.search);
-                      if (!urlParamsCheckM.has("room")) {
-                        const tkn = localStorage.getItem("myflix_token");
-                        const usrStr = localStorage.getItem("myflix_user");
-                        if (tkn && usrStr) {
-                          const usr = JSON.parse(usrStr);
-                          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ userId: usr.id, movieId: movie.id, currentTime: Math.floor(latestTimeRef.current || 0), serverName: activeServer, isEmbed: false })
-                          }).catch(() => {});
-                        }
-                      }
-                      const urlParams = new URLSearchParams(window.location.search);
-                      const roomId = urlParams.get("room");
-                      if (roomId && isHost) {
-                        const userString = localStorage.getItem("myflix_user");
-                        const user = userString ? JSON.parse(userString) : null;
-                        socket.emit("host_update_room_state", {
-                          roomId,
-                          hostUserId: user?.id,
-                          currentTime: latestTimeRef.current,
-                          isPlaying: true,
-                          episodeSlug: activeEpisode,
-                          episodeName: activeEpisodeName,
-                          serverName: activeServer,
-                          isEmbedMode: false
-                        });
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${!isEmbedMode ? "bg-red-600/90 border-red-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
-                  >
-                    M3U8 HLS (Server 1)
-                  </button>
 
+                  {/* Server 1: Embed Player (Ưu tiên ổn định) */}
                   <button
                     onClick={() => {
                       setIsEmbedMode(true);
@@ -242,7 +229,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       if (currentEp && (currentEp.link_embed || currentEp.link_m3u8)) {
                         setStreamUrl(currentEp.link_embed || currentEp.link_m3u8);
                       }
-                      // 💾 Lưu chế độ embed lên DB (chỉ xém cá nhân)
+                      // 💾 Lưu chế độ embed lên DB (chỉ xem cá nhân)
                       const urlParamsCheckE = new URLSearchParams(window.location.search);
                       if (!urlParamsCheckE.has("room")) {
                         const tkn = localStorage.getItem("myflix_token");
@@ -275,25 +262,69 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                     }}
                     className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${isEmbedMode ? "bg-amber-600 border-amber-500 text-white font-black" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
                   >
-                    EMBED (Server 2)
+                    EMBED
+                  </button>
+
+                  {/* Server 2: M3U8 HLS Player */}
+                  <button
+                    onClick={() => {
+                      setIsEmbedMode(false);
+                      const currentEp = episodes.find((ep: any) => ep.slug === activeEpisode) || episodes[0];
+                      if (currentEp && (currentEp.link_m3u8 || currentEp.link_embed)) {
+                        setStreamUrl(currentEp.link_m3u8 || currentEp.link_embed);
+                      }
+                      // 💾 Lưu chế độ m3u8 lên DB (chỉ xem cá nhân)
+                      const urlParamsCheckM = new URLSearchParams(window.location.search);
+                      if (!urlParamsCheckM.has("room")) {
+                        const tkn = localStorage.getItem("myflix_token");
+                        const usrStr = localStorage.getItem("myflix_user");
+                        if (tkn && usrStr) {
+                          const usr = JSON.parse(usrStr);
+                          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/history/update-time`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userId: usr.id, movieId: movie.id, currentTime: Math.floor(latestTimeRef.current || 0), serverName: activeServer, isEmbed: false })
+                          }).catch(() => {});
+                        }
+                      }
+                      const urlParams = new URLSearchParams(window.location.search);
+                      const roomId = urlParams.get("room");
+                      if (roomId && isHost) {
+                        const userString = localStorage.getItem("myflix_user");
+                        const user = userString ? JSON.parse(userString) : null;
+                        socket.emit("host_update_room_state", {
+                          roomId,
+                          hostUserId: user?.id,
+                          currentTime: latestTimeRef.current,
+                          isPlaying: true,
+                          episodeSlug: activeEpisode,
+                          episodeName: activeEpisodeName,
+                          serverName: activeServer,
+                          isEmbedMode: false
+                        });
+                      }
+                    }}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${!isEmbedMode ? "bg-red-600/90 border-red-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
+                  >
+                    M3U8 HLS
                   </button>
                 </div>
               </div>
 
               {/* Nút lưu phim cá nhân */}
-              <div className="mb-6 flex items-center gap-4">
+              <div className={`${isMaximized ? "mb-4" : "mb-6"} flex items-center gap-4`}>
                 <button
                   onClick={toggleMyList}
-                  className="flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white px-4 py-2 rounded-md font-bold transition border border-zinc-700 hover:border-white text-sm"
+                  className={`flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-md font-bold transition border border-zinc-700 hover:border-white ${isMaximized ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"}`}
                 >
                   {isInMyList ? (
                     <>
-                      <span className="text-green-500 text-lg">✓</span>
+                      <span className="text-green-500 text-base">✓</span>
                       <span>Đã lưu vào danh sách</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-xl">+</span>
+                      <span className="text-lg">+</span>
                       <span>Thêm vào danh sách</span>
                     </>
                   )}
@@ -301,7 +332,8 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               </div>
 
               <div
-                className="text-zinc-400 leading-relaxed text-sm md:text-base prose-sm max-w-none [&_p]:mb-2"
+                className={`text-zinc-400 leading-relaxed prose-sm max-w-none [&_p]:mb-2 ${isMaximized ? "text-xs md:text-sm line-clamp-3 hover:line-clamp-none transition-all cursor-pointer" : "text-sm md:text-base"}`}
+                title={isMaximized ? "Nhấn để đọc đầy đủ mô tả" : ""}
                 dangerouslySetInnerHTML={{
                   __html: (movie.description || "Chưa có mô tả cho bộ phim này.")
                     .replace(/<script[\s\S]*?<\/script>/gi, "") // strip scripts
@@ -312,12 +344,12 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
 
             {/* Khối hiển thị danh sách tập phim */}
             {episodes.length > 0 && (
-              <div className="md:w-80 w-full shrink-0">
-                <h3 className="text-xs font-bold mb-4 text-zinc-500 uppercase tracking-widest">
+              <div className={`${isMaximized ? "md:w-72" : "md:w-80"} w-full shrink-0`}>
+                <h3 className="text-xs font-bold mb-3 text-zinc-500 uppercase tracking-widest">
                   Danh sách tập ({episodes.length})
                 </h3>
                 <div 
-                  className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar overscroll-contain"
+                  className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2 ${isMaximized ? "max-h-[160px]" : "max-h-[220px]"} overflow-y-auto pr-2 custom-scrollbar overscroll-contain`}
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   {episodes.map((ep, idx) => {

@@ -1,6 +1,41 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { useVideoPlayerLogic } from "@/hooks/useVideoPlayerLogic";
+
+function EmbedPlayer({
+  src,
+  initialTime,
+  containerRef,
+}: {
+  src: string;
+  initialTime?: number;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  let embedSrc = src;
+  if (initialTime && initialTime > 0) {
+    const startSec = Math.floor(initialTime);
+    if (!embedSrc.includes("t=") && !embedSrc.includes("start=") && !embedSrc.includes("time=")) {
+      const sep = embedSrc.includes("?") ? "&" : "?";
+      embedSrc = `${embedSrc}${sep}t=${startSec}&start=${startSec}`;
+    }
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center"
+    >
+      <iframe
+        key={src}
+        src={embedSrc}
+        className="w-full h-full border-0"
+        allowFullScreen
+        allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+      />
+    </div>
+  );
+}
 
 type Props = {
   src: string;
@@ -83,25 +118,12 @@ export default function VideoPlayer(props: Props) {
   const isEmbedPlayer = props.src && (props.src.includes("player.") || props.src.includes("/player/") || props.src.includes("embed") || props.src.includes("phimapi") || props.src.includes("ophim"));
 
   if (isEmbedPlayer) {
-    let embedSrc = props.src;
-    if (props.initialTime && props.initialTime > 0) {
-      const startSec = Math.floor(props.initialTime);
-      if (!embedSrc.includes("t=") && !embedSrc.includes("start=") && !embedSrc.includes("time=")) {
-        const sep = embedSrc.includes("?") ? "&" : "?";
-        embedSrc = `${embedSrc}${sep}t=${startSec}&start=${startSec}`;
-      }
-    }
-
     return (
-      <div ref={playerContainerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
-        <iframe
-          key={`${embedSrc}-${Math.floor(props.initialTime || 0)}`}
-          src={embedSrc}
-          className="w-full h-full border-0"
-          allowFullScreen
-          allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
-        />
-      </div>
+      <EmbedPlayer
+        src={props.src}
+        initialTime={props.initialTime}
+        containerRef={playerContainerRef}
+      />
     );
   }
 

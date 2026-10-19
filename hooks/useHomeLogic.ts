@@ -117,6 +117,7 @@ export function useHomeLogic() {
                 movieObj.title = movieObj.title || movieObj.name;
                 movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
+                movieObj.banner = movieObj.banner || movieObj.thumb_url || movieObj.poster;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
                 uniqueMoviesMap.set(movieId, movieObj);
@@ -150,6 +151,7 @@ export function useHomeLogic() {
                 movieObj.title = movieObj.title || movieObj.name;
                 movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
+                movieObj.banner = movieObj.banner || movieObj.thumb_url || movieObj.poster;
                 movieObj.thumb_url = movieObj.thumb_url || movieObj.banner || movieObj.poster;
 
                 uniqueMoviesMap.set(movieId, movieObj);
