@@ -105,7 +105,7 @@ export function useVideoPlayerLogic({
     const targetId = movieData?.id || movieData?._id || cleanMovieId;
     const targetPoster = movieData?.poster || movieData?.poster_url || movieData?.thumb_url || "";
     const targetThumb = movieData?.thumb_url || movieData?.poster_url || movieData?.poster || "";
-    const targetTitle = movieData?.title || movieData?.name || movieTitle;
+    const targetTitle = movieData?.name || movieData?.title || movieTitle || "";
 
     const historyItem = {
       watchId: finalWatchId,
@@ -259,16 +259,16 @@ export function useVideoPlayerLogic({
     }
   };
 
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleMute = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!videoRef.current) return;
     videoRef.current.muted = !isMuted;
     setIsMuted(!isMuted);
     handleUserInteraction();
   };
 
-  const skipTime = (e: React.MouseEvent, amount: number) => {
-    e.stopPropagation();
+  const skipTime = (e?: React.MouseEvent | null, amount: number = 10) => {
+    if (e) e.stopPropagation();
     if (!videoRef.current) return;
     const newTime = Math.max(0, Math.min(videoRef.current.duration, videoRef.current.currentTime + amount));
     videoRef.current.currentTime = newTime;
@@ -281,8 +281,8 @@ export function useVideoPlayerLogic({
     }
   };
 
-  const handleSkipIntro = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleSkipIntro = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!videoRef.current) return;
     videoRef.current.currentTime = 90;
     setCurrentTime(90);
@@ -290,8 +290,8 @@ export function useVideoPlayerLogic({
     handleUserInteraction();
   };
 
-  const toggleFullscreen = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleFullscreen = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const container = playerContainerRef.current;
     if (!container) return;
 
@@ -364,21 +364,50 @@ export function useVideoPlayerLogic({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") return;
+      const activeEl = document.activeElement;
+      if (activeEl?.tagName === "INPUT" || activeEl?.tagName === "TEXTAREA" || (activeEl as HTMLElement)?.isContentEditable) {
+        return;
+      }
       if (!videoRef.current) return;
-      if (e.key === "ArrowRight" || e.keyCode === 39) {
-        e.preventDefault(); handleUserInteraction();
-        videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
-      } else if (e.key === "ArrowLeft" || e.keyCode === 37) {
-        e.preventDefault(); handleUserInteraction();
-        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
-      } else if (e.key === " " || e.keyCode === 32) {
-        e.preventDefault(); handleUserInteraction(); togglePlay();
+
+      const key = e.key.toLowerCase();
+
+      if (e.code === "Space" || key === " " || key === "k") {
+        e.preventDefault();
+        togglePlay();
+      } else if (key === "arrowright") {
+        e.preventDefault();
+        skipTime(null, 10);
+      } else if (key === "arrowleft") {
+        e.preventDefault();
+        skipTime(null, -10);
+      } else if (key === "arrowup") {
+        e.preventDefault();
+        videoRef.current.volume = Math.min(1, Math.round((videoRef.current.volume + 0.1) * 10) / 10);
+        if (videoRef.current.muted && videoRef.current.volume > 0) {
+          videoRef.current.muted = false;
+          setIsMuted(false);
+        }
+        handleUserInteraction();
+      } else if (key === "arrowdown") {
+        e.preventDefault();
+        videoRef.current.volume = Math.max(0, Math.round((videoRef.current.volume - 0.1) * 10) / 10);
+        if (videoRef.current.volume === 0) {
+          videoRef.current.muted = true;
+          setIsMuted(true);
+        }
+        handleUserInteraction();
+      } else if (key === "m") {
+        e.preventDefault();
+        toggleMute();
+      } else if (key === "f") {
+        e.preventDefault();
+        toggleFullscreen();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying]);
+  }, [isPlaying, isMuted, isFullscreen, duration]);
 
   useEffect(() => {
     const handleSuddenClose = () => {
@@ -425,6 +454,8 @@ export function useVideoPlayerLogic({
       const token = localStorage.getItem("myflix_token");
       const userString = localStorage.getItem("myflix_user");
 
+      const targetTitle = movieData?.name || movieData?.title || movieTitle || "";
+
       const historyItem = {
         watchId: finalWatchId,
         episodeSlug: currentEpisodeSlug,
@@ -433,15 +464,19 @@ export function useVideoPlayerLogic({
         updatedAt: new Date().toISOString(),
         movie: {
           id: movieData?.id || cleanMovieId,
+          _id: movieData?.id || cleanMovieId,
           slug: movieData?.slug || cleanMovieId,
-          title: movieData?.title || movieTitle,
-          description: movieData?.description || "",
-          poster: movieData?.poster || "",
-          banner: movieData?.banner || movieData?.poster || "",
+          title: targetTitle,
+          name: targetTitle,
+          description: movieData?.description || movieData?.content || "",
+          poster: movieData?.poster || movieData?.poster_url || movieData?.thumb_url || "",
+          poster_url: movieData?.poster_url || movieData?.poster || movieData?.thumb_url || "",
+          thumb_url: movieData?.thumb_url || movieData?.poster || "",
+          banner: movieData?.banner || movieData?.thumb_url || movieData?.poster || "",
           year: movieData?.year || 2026,
-          duration: movieData?.duration || "",
-          country: movieData?.country || "",
-          genre: movieData?.genre || "",
+          duration: movieData?.duration || movieData?.time || "",
+          country: typeof movieData?.country === "string" ? movieData.country : (movieData?.country?.[0]?.name || ""),
+          genre: typeof movieData?.genre === "string" ? movieData.genre : (movieData?.category?.[0]?.name || ""),
           episode_current: originalEpCurrent // Giữ nguyên "Tập 16" cho Card ngoài Home hiển thị
         }
       };

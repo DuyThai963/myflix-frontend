@@ -66,7 +66,7 @@ export default function VideoPlayer(props: Props) {
   } = useVideoPlayerLogic({
     src: props.src,
     movieId: props.movieId,
-    movieTitle: props.movieTitle || "Phim MyFlix",
+    movieTitle: props.movieTitle || props.movieData?.title || props.movieData?.name || "",
     isSeries: props.isSeries || false,
     onNext: props.onNext,
     onProgress: props.onProgress,

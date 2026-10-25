@@ -84,10 +84,9 @@ video ~ .absolute.inset-0.bg-gradient-to-t,
   z-index: 2147483647 !important;
 }
 
-/* KHÓA CHẶT NỀN WEBPAGE TUYỆT ĐỐI CHỈ KHI TRÌNH PHÁT ĐANG BẬT FIXED FULLSCREEN */
+/* KHÓA CUỘN NỀN KHI MODAL HOẶC OVERLAY ĐANG MỞ (GIỮ NGUYÊN VỊ TRÍ CUỘN, TRÁNH BỊ NHẢY LÊN ĐẦU TRANG) */
+html:has(.fixed.inset-0),
 body:has(.fixed.inset-0) {
   overflow: hidden !important;
-  position: fixed !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  overscroll-behavior: none !important;
 }

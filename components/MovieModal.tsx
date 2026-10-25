@@ -3,7 +3,7 @@
 import { Movie } from "@/types/movie";
 import VideoPlayer from "./VideoPlayer";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useMovieModalLogic, formatEpName, getBestStreamUrl } from "@/hooks/useMovieModalLogic";
 import { socket } from "@/services/socket.service";
 
@@ -12,6 +12,17 @@ type Props = {
   onClose: () => void;
   initialTime?: number;
   isWatchParty?: boolean;
+};
+
+const safeText = (val: any) => {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number") return String(val);
+  if (Array.isArray(val)) {
+    return val.map((item: any) => (typeof item === "object" ? (item?.name || item?.title || "") : String(item))).filter(Boolean).join(", ");
+  }
+  if (typeof val === "object") return val.name || val.title || "";
+  return String(val);
 };
 
 export default function MovieModal({ movie, onClose, initialTime = 0, isWatchParty = false }: Props) {
@@ -37,6 +48,75 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
 
   const [isRoom, setIsRoom] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShowShareMenu(false);
+      }
+    };
+    if (showShareMenu) {
+      document.addEventListener("click", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [showShareMenu]);
+
+  const handleCopyLink = () => {
+    if (!movie) return;
+    const shareUrl = `${window.location.origin}/movie/${movie.slug || movie.id}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {
+        prompt("Sao chép liên kết:", shareUrl);
+      });
+    } else {
+      prompt("Sao chép liên kết:", shareUrl);
+    }
+  };
+
+  const handleShareFacebook = () => {
+    if (!movie) return;
+    const shareUrl = `${window.location.origin}/movie/${movie.slug || movie.id}`;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, "_blank", "width=600,height=500,location=no,toolbar=no");
+  };
+
+  const handleShareMessenger = () => {
+    if (!movie) return;
+    const shareUrl = `${window.location.origin}/movie/${movie.slug || movie.id}`;
+    const isMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = `fb-messenger://share?link=${encodeURIComponent(shareUrl)}`;
+      setTimeout(() => {
+        window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=291494419107518&redirect_uri=${encodeURIComponent(shareUrl)}`, "_blank");
+      }, 1000);
+    } else {
+      window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=291494419107518&redirect_uri=${encodeURIComponent(shareUrl)}`, "_blank", "width=600,height=500,location=no,toolbar=no");
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!movie) return;
+    const shareUrl = `${window.location.origin}/movie/${movie.slug || movie.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: safeText(movie.title) || "MyFlix",
+          text: `Xem phim ${safeText(movie.title)} trên MyFlix!`,
+          url: shareUrl
+        });
+        setShowShareMenu(false);
+      } catch (err) {}
+    } else {
+      handleCopyLink();
+    }
+  };
 
   useEffect(() => {
     setIsRoom(new URLSearchParams(window.location.search).has("room"));
@@ -64,12 +144,12 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
     <motion.div 
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      className={`fixed inset-0 z-50 flex items-center justify-center select-none overflow-hidden transition-all duration-300 ${isMaximized ? "bg-black p-0" : "bg-black/80 p-0 md:p-4 backdrop-blur-sm"}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center select-none overflow-hidden transition-all duration-300 ${isMaximized ? "bg-black p-0" : "bg-black/90 p-0 md:p-6 backdrop-blur-md"}`}
     >
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()} 
-        className={`bg-[#141414] w-full h-full overflow-hidden flex flex-col relative shadow-2xl transition-all duration-300 ${isMaximized ? "rounded-none border-none max-w-none" : "md:h-[90vh] md:max-w-5xl md:rounded-lg border border-zinc-800"}`}
+        className={`bg-[#141414] w-full h-full overflow-hidden flex flex-col relative shadow-[0_0_60px_rgba(0,0,0,0.95)] transition-all duration-300 ${isMaximized ? "rounded-none border-none max-w-none" : "md:h-[90vh] md:max-w-5xl md:rounded-xl border border-zinc-800/80"}`}
       >
         <div 
           className="absolute right-4 z-50 flex items-center gap-2"
@@ -113,6 +193,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               key={`${movie.id}-${activeEpisode}`}
               src={streamUrl} 
               movieId={`${movie.id}-${activeEpisode}`} 
+              movieTitle={fullMovieDetail?.title || fullMovieDetail?.name || movie.title || (movie as any).name || ""}
               onProgress={handleProgress}
               isSeries={hasNextEpisode} 
               onNext={handleNextEpisode} 
@@ -139,14 +220,14 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
           <div className="flex flex-col md:flex-row justify-between gap-6 md:gap-8">
             <div className="flex-1">
               <h1 className={`${isMaximized ? "text-xl md:text-2xl mb-2" : "text-2xl md:text-4xl mb-3"} font-bold text-white leading-tight`}>
-                {movie.title}
+                {safeText(movie.title)}
               </h1>
 
               <div className={`flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm font-medium ${isMaximized ? "mb-3" : "mb-6"}`}>
-                <span className="text-green-500 font-bold">{movie.year}</span>
-                <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{movie.duration}</span>
-                <span className="text-zinc-400">{movie.genre}</span>
-                <span className="text-zinc-400 border-l border-zinc-700 pl-3 md:pl-4">{movie.country}</span>
+                <span className="text-green-500 font-bold">{safeText(movie.year)}</span>
+                <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">{safeText(movie.duration)}</span>
+                <span className="text-zinc-400">{safeText(movie.genre)}</span>
+                <span className="text-zinc-400 border-l border-zinc-700 pl-3 md:pl-4">{safeText(movie.country)}</span>
               </div>
 
               {/* Bộ chọn Nguồn Phim (Vietsub / Lồng Tiếng) & Định dạng Trình phát (HLS / Embed) */}
@@ -311,8 +392,8 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                 </div>
               </div>
 
-              {/* Nút lưu phim cá nhân */}
-              <div className={`${isMaximized ? "mb-4" : "mb-6"} flex items-center gap-4`}>
+              {/* Nút lưu phim cá nhân & Chia sẻ */}
+              <div className={`${isMaximized ? "mb-4" : "mb-6"} flex items-center gap-3 relative`}>
                 <button
                   onClick={toggleMyList}
                   className={`flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-md font-bold transition border border-zinc-700 hover:border-white ${isMaximized ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"}`}
@@ -329,6 +410,101 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                     </>
                   )}
                 </button>
+
+                {/* Nút chia sẻ hình tròn */}
+                <div className="relative" ref={shareMenuRef}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowShareMenu((prev) => !prev);
+                    }}
+                    title="Chia sẻ phim"
+                    className={`flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition border border-zinc-700 hover:border-white cursor-pointer active:scale-95 ${isMaximized ? "w-7 h-7" : "w-9 h-9"}`}
+                  >
+                    <svg className={`${isMaximized ? "w-3.5 h-3.5" : "w-4 h-4"} text-zinc-200`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                  </button>
+
+                  {/* Menu chia sẻ thả xuống (Floating Dropdown) */}
+                  {showShareMenu && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute left-0 bottom-full mb-2 w-56 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.9)] p-2 z-[9999] animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 px-3 py-1 border-b border-zinc-800 mb-1">
+                        Chia sẻ phim
+                      </div>
+
+                      {/* 1. Sao chép liên kết */}
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left cursor-pointer"
+                      >
+                        {copied ? (
+                          <>
+                            <span className="text-green-500 font-bold text-sm">✓</span>
+                            <span className="text-green-400 font-bold">Đã sao chép link!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                            <span>Sao chép liên kết</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* 2. Chia sẻ Facebook */}
+                      <button
+                        type="button"
+                        onClick={handleShareFacebook}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-blue-600/20 hover:text-blue-400 transition text-left cursor-pointer"
+                      >
+                        <svg className="w-4 h-4 text-[#1877F2] fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        <span>Chia sẻ Facebook</span>
+                      </button>
+
+                      {/* 3. Gửi qua Messenger */}
+                      <button
+                        type="button"
+                        onClick={handleShareMessenger}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-sky-600/20 hover:text-sky-400 transition text-left cursor-pointer"
+                      >
+                        <svg className="w-4 h-4 text-[#00B2FF] fill-current shrink-0" viewBox="0 0 24 24">
+                          <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.093.303 2.252.464 3.443.464 6.627 0 12-4.974 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.889-3.259-6.56 6.963z"/>
+                        </svg>
+                        <span>Gửi qua Messenger</span>
+                      </button>
+
+                      {/* 4. Chia sẻ khác (Native OS) */}
+                      {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+                        <button
+                          type="button"
+                          onClick={handleNativeShare}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left cursor-pointer border-t border-zinc-800/80 mt-1"
+                        >
+                          <svg className="w-4 h-4 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                          </svg>
+                          <span>Chia sẻ khác...</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div

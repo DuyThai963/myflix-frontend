@@ -1,4 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : "http://localhost:5000/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : "http://localhost:5000/api");
 
 const getImageUrl = (path: string) => {
   if (!path) return "https://placehold.co/600x400/18181b/ffffff?text=No+Image";
@@ -47,10 +48,18 @@ export const movieService = {
       if (resData && resData.movie) {
         return {
           item: resData.movie,
+          movie: resData.movie,
           episodes: resData.episodes
         };
       }
-      if (resData.data) return resData.data;
+      if (resData.data) {
+        return {
+          ...resData.data,
+          movie: resData.data.item || resData.data.movie,
+          item: resData.data.item || resData.data.movie,
+          episodes: resData.data.episodes || resData.episodes
+        };
+      }
       return null;
     } catch (error) {
       console.error("Lỗi kết nối API Backend:", error);

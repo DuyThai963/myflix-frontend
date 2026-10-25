@@ -279,8 +279,19 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
 
       try {
         const data = await movieService.getMovieDetail(movie.slug);
-        if (data && data.episodes) {
-          if (data.movie) setFullMovieDetail(data.movie);
+          if (data.movie || data.item) {
+            const rawDetail = data.movie || data.item;
+            const validTitle = rawDetail.name || rawDetail.title || movie.title || (movie as any).name || "";
+            setFullMovieDetail({
+              ...rawDetail,
+              title: validTitle,
+              name: validTitle,
+              poster: rawDetail.poster || rawDetail.poster_url || rawDetail.thumb_url || movie.poster,
+              poster_url: rawDetail.poster_url || rawDetail.thumb_url || rawDetail.poster || movie.poster_url,
+              thumb_url: rawDetail.thumb_url || rawDetail.poster_url || rawDetail.poster || movie.thumb_url,
+              banner: rawDetail.banner || rawDetail.tmdb_backdrop || rawDetail.thumb_url || rawDetail.poster_url || movie.banner
+            });
+          }
 
           setEpisodeData(data.episodes);
           // 🎯 Ưu tiên: server được lưu trong DB history (foundServerName), sau đó mới dùng server từ Watch Party prop
@@ -376,8 +387,11 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
             }
 
             // --- KHỞI TẠO KHUNG PHIM TĨNH (THỜI ĐIỂM 1) ---
-            if (!data.item || !data.item.name) {
-              console.warn("⚠️ Chặn Init History: Thiếu dữ liệu phim gốc data.item hoặc data.item.name");
+            const rawItem = data.movie || data.item || {};
+            const resolvedTitle = rawItem.name || rawItem.title || movie.title || (movie as any).name || "";
+
+            if (!resolvedTitle) {
+              console.warn("⚠️ Chặn Init History: Thiếu dữ liệu tiêu đề phim");
             } else {
               try {
                 const token = localStorage.getItem("myflix_token");
@@ -389,19 +403,18 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
                   if (hasInitRef.current !== targetMovieId) {
                     hasInitRef.current = targetMovieId;
                     
-                    const rawItem = data.item || {};
                     const cleanMovieId = targetMovieId;
                     const moviePayload = {
                       id: cleanMovieId,
                       _id: cleanMovieId,
                       slug: rawItem.slug || movie.slug || cleanMovieId,
-                      title: rawItem.name || rawItem.title || movie.title || "Phim MyFlix",
-                      name: rawItem.name || rawItem.title || movie.title || "Phim MyFlix",
+                      title: resolvedTitle,
+                      name: resolvedTitle,
                       description: rawItem.content || rawItem.description || movie.description || "",
                       poster: rawItem.poster_url || rawItem.thumb_url || movie.poster || "",
                       poster_url: rawItem.poster_url || rawItem.thumb_url || movie.poster || "",
                       thumb_url: rawItem.thumb_url || rawItem.poster_url || movie.poster || "",
-                      banner: rawItem.poster_url || rawItem.thumb_url || movie.poster || "",
+                      banner: rawItem.banner || rawItem.poster_url || rawItem.thumb_url || movie.banner || movie.poster || "",
                       year: rawItem.year || movie.year || 2026,
                       duration: rawItem.time || movie.duration || "",
                       country: Array.isArray(rawItem.country) ? (rawItem.country[0]?.name || "") : (rawItem.country || movie.country || ""),
@@ -440,7 +453,6 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
               }
             }
           }
-        }
       } catch (error) {
         console.error("LỖI FETCH DETAIL MODAL:", error);
       } finally {

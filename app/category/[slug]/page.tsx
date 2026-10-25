@@ -73,8 +73,8 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
         <h1 className="text-3xl font-bold mb-8">{displayName}</h1>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {movies.map((movie) => (
-            <div key={`${movie.id}-${Math.random()}`} className="w-full">
+          {movies.map((movie, index) => (
+            <div key={`${movie.id || movie.slug}-${index}`} className="w-full">
               <MovieCard movie={movie} onClick={() => setSelectedMovie(movie)} />
             </div>
           ))}
@@ -99,7 +99,13 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
         )}
       </div>
 
-      <MovieModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      <MovieModal
+        movie={selectedMovie}
+        onClose={() => {
+          setSelectedMovie(null);
+          window.dispatchEvent(new Event("myflix_history_updated"));
+        }}
+      />
       <Footer />
     </main>
   );

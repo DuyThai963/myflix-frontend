@@ -81,7 +81,10 @@ function SearchResults() {
 
       <MovieModal
         movie={selectedMovie}
-        onClose={() => setSelectedMovie(null)}
+        onClose={() => {
+          setSelectedMovie(null);
+          window.dispatchEvent(new Event("myflix_history_updated"));
+        }}
       />
     </>
   );

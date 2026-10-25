@@ -114,7 +114,24 @@ export function useHomeLogic() {
                 movieObj.currentTime = typeof item.currentTime === "number" ? item.currentTime : parseFloat(item.watched_time || 0); 
 
                 // 🛡️ Đồng bộ tên phim và trường ảnh để né lỗi "No Image" ngoài trang chủ
-                movieObj.title = movieObj.title || movieObj.name;
+                const validTitle = (movieObj.title && movieObj.title !== "Phim MyFlix") 
+                  ? movieObj.title 
+                  : ((movieObj.name && movieObj.name !== "Phim MyFlix") ? movieObj.name : (movieObj.title || movieObj.name));
+                movieObj.title = validTitle;
+                
+                const formatField = (val: any) => {
+                  if (!val) return "";
+                  if (typeof val === "string") return val;
+                  if (Array.isArray(val)) {
+                    return val.map((item: any) => (typeof item === "object" ? (item?.name || item?.title || "") : String(item))).filter(Boolean).join(", ");
+                  }
+                  if (typeof val === "object") return val.name || val.title || "";
+                  return String(val);
+                };
+                movieObj.genre = formatField(movieObj.genre);
+                movieObj.country = formatField(movieObj.country);
+                movieObj.description = typeof movieObj.description === "string" ? movieObj.description : "";
+
                 movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.banner = movieObj.banner || movieObj.thumb_url || movieObj.poster;
@@ -148,7 +165,24 @@ export function useHomeLogic() {
                 movieObj.currentTime = typeof item.currentTime === "number" ? item.currentTime : 0;
 
                 // 🛡️ Đồng bộ tên phim và trường ảnh cho luồng Guest
-                movieObj.title = movieObj.title || movieObj.name;
+                const validTitle = (movieObj.title && movieObj.title !== "Phim MyFlix") 
+                  ? movieObj.title 
+                  : ((movieObj.name && movieObj.name !== "Phim MyFlix") ? movieObj.name : (movieObj.title || movieObj.name));
+                movieObj.title = validTitle;
+
+                const formatField = (val: any) => {
+                  if (!val) return "";
+                  if (typeof val === "string") return val;
+                  if (Array.isArray(val)) {
+                    return val.map((item: any) => (typeof item === "object" ? (item?.name || item?.title || "") : String(item))).filter(Boolean).join(", ");
+                  }
+                  if (typeof val === "object") return val.name || val.title || "";
+                  return String(val);
+                };
+                movieObj.genre = formatField(movieObj.genre);
+                movieObj.country = formatField(movieObj.country);
+                movieObj.description = typeof movieObj.description === "string" ? movieObj.description : "";
+
                 movieObj.poster = movieObj.poster || movieObj.poster_url || movieObj.thumb_url;
                 movieObj.poster_url = movieObj.poster_url || movieObj.poster || movieObj.thumb_url;
                 movieObj.banner = movieObj.banner || movieObj.thumb_url || movieObj.poster;

@@ -19,27 +19,10 @@ export default function MoviesPage() {
   const fetchMovies = async (pageNum: number) => {
     setLoading(true);
     try {
-      // Gọi qua proxy backend để lấy danh sách phim, không gọi trực tiếp OPhim
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/home?page=${pageNum}`);
-      const data = await response.json();
-      
-      const items = data?.data?.items || data?.items || [];
-      
-      if (items.length > 0) {
-        const newMovies = items.map((m: any) => ({
-          id: m._id || m.id || m.slug,
-          slug: m.slug,
-          title: m.name || m.title,
-          poster: m.poster_url || m.thumb_url,
-          year: m.year,
-          genre: m.category?.[0]?.name || "Phim lẻ"
-        }));
-
-        // Cộng dồn phim mới vào danh sách cũ
-        setMovies(prev => pageNum === 1 ? newMovies : [...prev, ...newMovies]);
-        
-        // Nếu số lượng trả về ít hơn 10 thì có thể đã hết phim
-        if (newMovies.length < 10) setHasMore(false);
+      const data = await movieService.getMoviesByCategory("phim-le", pageNum);
+      if (data && data.length > 0) {
+        setMovies(prev => pageNum === 1 ? data : [...prev, ...data]);
+        if (data.length < 10) setHasMore(false);
       } else {
         setHasMore(false);
       }
@@ -66,11 +49,11 @@ export default function MoviesPage() {
       <Navbar keyword={keyword} setKeyword={setKeyword} />
 
       <div className="flex-1 px-6 md:px-12 pt-32 pb-12">
-        <h1 className="text-3xl font-bold mb-8">Movies</h1>
+        <h1 className="text-3xl font-bold mb-8">Phim Lẻ (Movies)</h1>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {movies.map((movie) => (
-            <div key={movie.id} className="w-full">
+          {movies.map((movie, index) => (
+            <div key={`${movie.id || movie.slug}-${index}`} className="w-full">
               <MovieCard movie={movie} onClick={() => setSelectedMovie(movie)} />
             </div>
           ))}
@@ -78,19 +61,30 @@ export default function MoviesPage() {
 
         {/* Nút Tải thêm */}
         {hasMore && (
-          <div className="flex justify-center mt-12">
+          <div className="flex justify-center mt-12 mb-8">
             <button
               onClick={handleLoadMore}
               disabled={loading}
-              className="bg-white text-black px-8 py-2 rounded-md font-bold hover:bg-gray-200 transition disabled:bg-gray-500"
+              className="bg-red-600 text-white px-8 py-2 rounded-md font-bold hover:bg-red-700 transition disabled:bg-zinc-800 disabled:text-zinc-500 cursor-pointer"
             >
-              {loading ? "Đang tải..." : "Tải thêm"}
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Đang tải...
+                </div>
+              ) : "Xem thêm"}
             </button>
           </div>
         )}
       </div>
 
-      <MovieModal movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
+      <MovieModal
+        movie={selectedMovie}
+        onClose={() => {
+          setSelectedMovie(null);
+          window.dispatchEvent(new Event("myflix_history_updated"));
+        }}
+      />
       <Footer />
     </main>
   );

@@ -139,6 +139,7 @@ export default function MyList() {
           setSelectedMovie(null);
           // Load lại phòng trường hợp bạn ấn Bỏ lưu ngay trong Modal
           loadMyList();
+          window.dispatchEvent(new Event("myflix_history_updated"));
         }}
       />
 

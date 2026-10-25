@@ -1,7 +1,8 @@
 "use client";
 
 import { Movie } from "@/types/movie";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type Props = {
   movie: Movie;
@@ -10,7 +11,8 @@ type Props = {
 };
 
 export default function MovieCard({ movie, onClick, onRemove }: Props) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const [imageError, setImageError] = useState(false);
   const getEpisodeTag = () => {
     const current = movie.episode_current || "";
     const total = movie.episode_total || "";
@@ -65,11 +67,26 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
     };
   }, []);
 
+  const movieSlug = movie.slug || movie.id;
+  const movieUrl = `/movie/${movieSlug}`;
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Nếu bấm chuột giữa hoặc giữ tổ hợp phím (Ctrl, Cmd, Shift, Alt) -> Cho phép trình duyệt tự mở tab mới theo href
+    if (e.button === 1 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
+      return;
+    }
+    // Click chuột trái bình thường -> Chặn nhảy trang toàn phần, mở Modal xem phim ngay tại chỗ để giữ nguyên vị trí cuộn & kết quả tìm kiếm
+    e.preventDefault();
+    onClick();
+  };
+
   return (
-    <div
+    <Link
       ref={cardRef} // Gắn ref để kích hoạt bộ bẫy chống zoom Native
-      onClick={onClick}
+      href={movieUrl}
+      onClick={handleClick}
       className="
+        block
         relative
         w-full 
         aspect-[2/3] 
@@ -98,7 +115,6 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         WebkitBackfaceVisibility: "hidden",
         WebkitPerspective: "1000",
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
-        WebkitTouchCallout: "none"
       }}
     >
       {tag && tag.text && (
@@ -117,23 +133,33 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         </div>
       )}
       {/* Poster phim */}
-      {movie.poster ? (
+      {movie.poster && !imageError ? (
         <img
           src={movie.poster}
           alt={movie.title}
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageError(true)}
           className="w-full h-full object-cover object-top pointer-events-none select-none unselectable"
           draggable="false"
         />
       ) : (
-        <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
-          <span className="text-zinc-500 text-sm">No Image</span>
+        <div className="w-full h-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black flex flex-col items-center justify-center p-3 text-center select-none">
+          <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center mb-1.5 shadow-md">
+            <span className="text-red-500 font-extrabold text-xs tracking-tighter">MF</span>
+          </div>
+          <span className="text-zinc-300 text-[11px] font-medium line-clamp-2 px-1 leading-snug drop-shadow">
+            {movie.title}
+          </span>
         </div>
       )}
 
       {/* Nút xóa - Giữ nguyên vẹn */}
       {onRemove && (
         <button
+          type="button"
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onRemove(e);
           }}
@@ -164,10 +190,14 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
           <p className="text-[10px] text-gray-300 mt-1 font-medium flex items-center gap-2">
             <span className="text-green-500 font-bold">{movie.year}</span> 
             <span className="opacity-60">|</span>
-            <span className="truncate">{movie.genre}</span>
+            <span className="truncate">
+              {typeof (movie as any).genre === "object" 
+                ? (Array.isArray((movie as any).genre) ? (movie as any).genre.map((g: any) => (typeof g === "object" ? g?.name || "" : g)).filter(Boolean).join(", ") : (movie as any).genre?.name || "") 
+                : (movie.genre || "")}
+            </span>
           </p>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -18,7 +18,7 @@ export default function LoadingIntro({ isLoading }: { isLoading: boolean }) {
   // Nếu đã xong nhiệm vụ thì trả về null (Không render gì cả)
   if (isCompletelyHidden) return null;
 
-  const doorTransition = { duration: 1.5, ease: [0.7, 0, 0.3, 1], delay: 0.5 };
+  const doorTransition = { duration: 1.5, ease: [0.7, 0, 0.3, 1] as const, delay: 0.5 };
 
   return (
     <motion.div
