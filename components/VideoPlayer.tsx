@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useVideoPlayerLogic } from "@/hooks/useVideoPlayerLogic";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 function EmbedPlayer({
   src,
@@ -12,6 +13,8 @@ function EmbedPlayer({
   initialTime?: number;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  useWakeLock(true);
+
   let embedSrc = src;
   if (initialTime && initialTime > 0) {
     const startSec = Math.floor(initialTime);

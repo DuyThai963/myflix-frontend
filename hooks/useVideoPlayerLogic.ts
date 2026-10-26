@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { socket } from "@/services/socket.service";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 type HookProps = {
   src: string;
@@ -66,6 +67,9 @@ export function useVideoPlayerLogic({
     const urlParams = new URLSearchParams(window.location.search);
     roomIdRef.current = urlParams.get("room");
   }, []);
+
+  const isEmbedPlayer = src && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("phimapi") || src.includes("ophim"));
+  useWakeLock(!isEmbedPlayer && isPlaying);
 
   const handleUserInteraction = () => {
     setShowControls(true);
