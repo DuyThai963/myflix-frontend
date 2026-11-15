@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import { useMovieModalLogic, formatEpName, getBestStreamUrl } from "@/hooks/useMovieModalLogic";
 import { socket } from "@/services/socket.service";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 type Props = {
   movie: Movie | null;
@@ -26,6 +27,8 @@ const safeText = (val: any) => {
 };
 
 export default function MovieModal({ movie, onClose, initialTime = 0, isWatchParty = false }: Props) {
+  useWakeLock(Boolean(movie));
+
   const {
     streamUrl, setStreamUrl,
     loading,

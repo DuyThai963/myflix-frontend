@@ -34,7 +34,7 @@ function EmbedPlayer({
         src={embedSrc}
         className="w-full h-full border-0"
         allowFullScreen
-        allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+        allow="autoplay; encrypted-media; gyroscope; picture-in-picture; screen-wake-lock"
       />
     </div>
   );
