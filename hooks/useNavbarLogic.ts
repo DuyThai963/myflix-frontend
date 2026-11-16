@@ -1,17 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useServer } from "@/context/ServerContext";
 
 export function useNavbarLogic(keyword: string, setKeyword: (value: string) => void) {
   const [showSearch, setShowSearch] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showServerDropdown, setShowServerDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   
+  // 🌐 Quản lý Server Nguồn Toàn Cục (5 Server)
+  const { currentServerId, currentServer, serverList, switchServer } = useServer();
+
   // 🔐 Quản lý Đăng nhập & Xác thực từ AuthContext
   const { isLoggedIn, user, logout, login, authError, setAuthError } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -25,6 +30,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+  const serverDropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -57,7 +63,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     router.refresh();
   };
 
-  // 🔍 Xử lý tìm kiếm định thời Debounce Suggestions phim
+  // 🔍 Xử lý tìm kiếm định thời Debounce Suggestions phim qua Active Server
   useEffect(() => {
     const cleanKeyword = keyword.trim();
     
@@ -73,17 +79,16 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/search?keyword=${encodeURIComponent(cleanKeyword)}`, {
+        const response = await fetch(`/api/proxy-movies?action=search&keyword=${encodeURIComponent(cleanKeyword)}&server=${currentServerId}`, {
           signal: controller.signal
         });
         const data = await response.json();
-        if (data?.data?.items) {
-          setSuggestions(data.data.items.slice(0, 5));
+        if (data?.data && Array.isArray(data.data)) {
+          setSuggestions(data.data.slice(0, 5));
         } else {
           setSuggestions([]);
         }
       } catch (error: any) {
-        if (error.name !== "AbortError") console.error("Suggestions Error:", error);
         if (error.name !== "AbortError") {
           console.error("Suggestions Error:", error);
           setSuggestions([]);
@@ -97,7 +102,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [keyword]);
+  }, [keyword, currentServerId]);
 
   const handleSearchSubmit = (searchKey: string) => {
     const cleanKey = searchKey.trim();
@@ -130,6 +135,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
       const target = event.target as Node;
       if (dropdownRef.current && !dropdownRef.current.contains(target)) setShowDropdown(false);
       if (userDropdownRef.current && !userDropdownRef.current.contains(target)) setShowUserDropdown(false);
+      if (serverDropdownRef.current && !serverDropdownRef.current.contains(target)) setShowServerDropdown(false);
       if (showSearch && searchContainerRef.current && !searchContainerRef.current.contains(target)) {
         setShowSearch(false);
         setShowSuggestions(false);
@@ -148,6 +154,12 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
     showSearch, setShowSearch,
     isScrolled,
     showDropdown, setShowDropdown,
+    showServerDropdown, setShowServerDropdown,
+    serverDropdownRef,
+    currentServerId,
+    currentServer,
+    serverList,
+    switchServer,
     isMobileMenuOpen, setIsMobileMenuOpen,
     searchHistory,
     suggestions,

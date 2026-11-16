@@ -7,7 +7,9 @@ export interface Episode {
 
 export interface Movie {
   id: string;
+  _id?: string;
   title: string;
+  name?: string;
   description: string;
   banner: string;
   poster: string;

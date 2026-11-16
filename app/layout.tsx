@@ -4,6 +4,7 @@ import "./globals.css";
 import ZoomBlocker from "@/components/ZoomBlocker"; // IMPORT THẰNG NÀY VÀO
 import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "@/context/AuthContext";
+import { ServerProvider } from "@/context/ServerContext";
 import NetflixAuthGate from "@/components/NetflixAuthGate";
 
 const geistSans = Geist({
@@ -56,11 +57,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-black text-white selection:bg-red-600 selection:text-white">
         <AuthProvider>
-          <NetflixAuthGate>
-            <ZoomBlocker /> 
-            {children}
-            <Analytics />
-          </NetflixAuthGate>
+          <ServerProvider>
+            <NetflixAuthGate>
+              <ZoomBlocker /> 
+              {children}
+              <Analytics />
+            </NetflixAuthGate>
+          </ServerProvider>
         </AuthProvider>
       </body>
     </html>

@@ -8,11 +8,13 @@ import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 
 // 1. Tách toàn bộ logic tìm kiếm vào Component này
 function SearchResults() {
   const searchParams = useSearchParams();
   const queryParam = searchParams.get("q") || ""; // Dùng "q" giống code cũ của bạn
+  const { currentServerId } = useServer();
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
@@ -24,7 +26,7 @@ function SearchResults() {
     setKeyword(queryParam);
   }, [queryParam]);
 
-  // Gọi API tìm kiếm
+  // Gọi API tìm kiếm theo server hiện tại
   useEffect(() => {
     const fetchSearchResults = async () => {
       if (!queryParam.trim()) {
@@ -34,7 +36,7 @@ function SearchResults() {
       
       setIsLoading(true);
       try {
-        const data = await movieService.searchMovies(queryParam);
+        const data = await movieService.searchMovies(queryParam, currentServerId);
         setMovies(data);
       } catch (error) {
         console.error("Lỗi khi tìm kiếm:", error);
@@ -45,7 +47,7 @@ function SearchResults() {
     };
 
     fetchSearchResults();
-  }, [queryParam]);
+  }, [queryParam, currentServerId]);
 
   return (
     <>

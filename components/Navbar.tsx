@@ -28,6 +28,8 @@ export default function Navbar({ keyword, setKeyword }: Props) {
     loginError,
     isLoading,
     searchContainerRef, dropdownRef, userDropdownRef,
+    showServerDropdown, setShowServerDropdown, serverDropdownRef,
+    currentServerId, currentServer, serverList, switchServer,
     pathname,
     handleLoginSubmit, handleLogout, handleSearchSubmit, handleRemoveHistory
   } = useNavbarLogic(keyword, setKeyword);
@@ -51,15 +53,14 @@ export default function Navbar({ keyword, setKeyword }: Props) {
   ];
 
   return (
-    <div className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 pt-[env(safe-area-inset-top)] ${
-      isScrolled || isMobileMenuOpen ? "bg-black shadow-lg" : "bg-gradient-to-b from-black/90 via-black/40 to-transparent"
-    }`}>
+    <div className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 pt-[env(safe-area-inset-top)] ${isScrolled || isMobileMenuOpen ? "bg-black shadow-lg" : "bg-gradient-to-b from-black/90 via-black/40 to-transparent"
+      }`}>
       <div className="flex items-center justify-between px-6 md:px-12 py-4">
-        
+
         {/* LEFT SECTION */}
         <div className="flex items-center gap-4 md:gap-8">
-          <button 
-            className="md:hidden text-white text-2xl active:scale-90 transition-transform" 
+          <button
+            className="md:hidden text-white text-2xl active:scale-90 transition-transform"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
@@ -72,27 +73,25 @@ export default function Navbar({ keyword, setKeyword }: Props) {
           <div className="hidden md:flex gap-6 text-sm font-medium items-center text-gray-300">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
-                <span className={`cursor-pointer transition-colors duration-200 ${
-                  pathname === link.href ? "text-white font-bold" : "hover:text-white"
-                }`}>
+                <span className={`cursor-pointer transition-colors duration-200 ${pathname === link.href ? "text-white font-bold" : "hover:text-white"
+                  }`}>
                   {link.name}
                 </span>
               </Link>
             ))}
 
-            <div 
-              className="relative" 
+            <div
+              className="relative"
               ref={dropdownRef}
               onMouseEnter={() => { if (window.matchMedia('(pointer: fine)').matches) setShowDropdown(true); }}
               onMouseLeave={() => { if (window.matchMedia('(pointer: fine)').matches) setShowDropdown(false); }}
             >
-              <div 
+              <div
                 onClick={(e) => { e.preventDefault(); setShowDropdown(!showDropdown); }}
-                className={`cursor-pointer flex items-center gap-1 transition-colors duration-200 ${
-                  pathname.includes("/category") || showDropdown ? "text-white font-bold" : "hover:text-white"
-                }`}
+                className={`cursor-pointer flex items-center gap-1 transition-colors duration-200 ${pathname.includes("/category") || showDropdown ? "text-white font-bold" : "hover:text-white"
+                  }`}
               >
-                Categories 
+                Categories
                 <FaChevronDown className={`text-[10px] transition-transform duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
               </div>
 
@@ -128,51 +127,51 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                 autoFocus
               />
             )}
-            <FaSearch 
-              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg active:scale-90" 
+            <FaSearch
+              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg active:scale-90"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowSearch(!showSearch);
                 setShowSuggestions(!showSearch);
-              }} 
+              }}
             />
 
             {showSuggestions && (keyword.trim().length >= 2 || searchHistory.length > 0) && (
               <div className="absolute top-full right-0 mt-2 w-[280px] sm:w-[350px] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
-                
+
                 {keyword.trim().length >= 2 ? (
                   isSearching ? (
-                  /* TRẠNG THÁI 1: ĐANG FETCH API */
-                  <div className="p-4 text-center text-zinc-400 text-sm flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-600 rounded-full animate-spin" />
-                    Đang tìm kiếm...
-                  </div>
-                ) : suggestions.length > 0 ? (
-                  /* TRẠNG THÁI 2: CÓ KẾT QUẢ */
-                  <ul>
-                    {suggestions.map((movie) => (
-                      <div
-                        key={movie._id || movie.slug}
-                        onClick={() => { handleSearchSubmit(movie.name); setShowSuggestions(false); }}
-                        className="flex items-center gap-2 p-1.5 hover:bg-zinc-900 rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
-                      >
-                        <img 
-                          src={movie.thumb_url || "https://placehold.co/600x400/18181b/ffffff?text=No+Image"} 
-                          alt={movie.name} 
-                          className="w-7 aspect-[2/3] rounded object-cover flex-shrink-0" 
-                        />
-                        <div className="flex flex-col truncate flex-1 min-w-0">
-                          <span className="text-xs font-semibold text-white truncate">{movie.name}</span>
-                          <span className="text-[10px] text-zinc-400">{movie.year} | {movie.episode_current || "Full"}</span>
+                    /* TRẠNG THÁI 1: ĐANG FETCH API */
+                    <div className="p-4 text-center text-zinc-400 text-sm flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-zinc-600 border-t-red-600 rounded-full animate-spin" />
+                      Đang tìm kiếm...
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    /* TRẠNG THÁI 2: CÓ KẾT QUẢ */
+                    <ul>
+                      {suggestions.map((movie) => (
+                        <div
+                          key={movie._id || movie.slug}
+                          onClick={() => { handleSearchSubmit(movie.name); setShowSuggestions(false); }}
+                          className="flex items-center gap-2 p-1.5 hover:bg-zinc-900 rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
+                        >
+                          <img
+                            src={movie.thumb_url || "https://placehold.co/600x400/18181b/ffffff?text=No+Image"}
+                            alt={movie.name}
+                            className="w-7 aspect-[2/3] rounded object-cover flex-shrink-0"
+                          />
+                          <div className="flex flex-col truncate flex-1 min-w-0">
+                            <span className="text-xs font-semibold text-white truncate">{movie.name}</span>
+                            <span className="text-[10px] text-zinc-400">{movie.year} | {movie.episode_current || "Full"}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </ul>
-                ) : (
-                  /* TRẠNG THÁI 3: KHÔNG TÌM THẤY */
-                  <div className="p-4 text-center text-zinc-400 text-sm">
-                    Không tìm thấy phim nào khớp với "{keyword}"
-                  </div>
+                      ))}
+                    </ul>
+                  ) : (
+                    /* TRẠNG THÁI 3: KHÔNG TÌM THẤY */
+                    <div className="p-4 text-center text-zinc-400 text-sm">
+                      Không tìm thấy phim nào khớp với "{keyword}"
+                    </div>
                   )
                 ) : (
                   /* TRẠNG THÁI 4: LỊCH SỬ TÌM KIẾM */
@@ -191,7 +190,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                           </div>
                           <button
                             onClick={(e) => handleRemoveHistory(e, item)}
-                        className="text-zinc-500 hover:text-white p-1 text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90 shrink-0"
+                            className="text-zinc-500 hover:text-white p-1 text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity active:scale-90 shrink-0"
                           >
                             ✕
                           </button>
@@ -204,14 +203,66 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               </div>
             )}
           </div>
-          
+
           <FaBell className="hidden lg:block cursor-pointer text-gray-300 hover:text-white transition-colors text-lg" />
-          
+
+          {/* [Design Read] Precision Netflix dark HUD pill with subtle status dot, tactile borders, WCAG AA contrast, and zero-flicker server switching. */}
+          {/* SERVER SOURCE SELECTOR (5 NGUỒN PHÁT TOÀN CỤC) */}
+          <div className="relative" ref={serverDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowServerDropdown(!showServerDropdown)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-600 transition-all duration-200 active:scale-95 text-xs text-zinc-200 group shadow-sm"
+              title="Chọn nguồn máy chủ"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-semibold text-zinc-100 hidden sm:inline">{currentServer.name}</span>
+              <span className="font-semibold text-zinc-100 sm:hidden">{currentServer.shortName}</span>
+              <FaChevronDown className={`text-[9px] text-zinc-400 transition-transform duration-200 ${showServerDropdown ? 'rotate-180 text-red-500' : 'group-hover:text-white'}`} />
+            </button>
+
+            {showServerDropdown && (
+              <div className="absolute top-full right-0 mt-2 w-64 pt-1 z-[110] animate-in fade-in zoom-in-95 duration-200">
+                <div className="bg-zinc-950/95 border border-zinc-800/90 rounded-xl py-2 shadow-2xl backdrop-blur-md flex flex-col relative divide-y divide-zinc-900">
+                  <div className="px-3.5 py-2 flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                    <span>Nguồn máy chủ</span>
+                    <span className="text-[10px] text-red-500 font-mono font-normal">Active: {currentServer.shortName}</span>
+                  </div>
+
+                  <div className="py-1">
+                    {serverList.map((server) => {
+                      const isSelected = server.id === currentServerId;
+                      return (
+                        <button
+                          key={server.id}
+                          type="button"
+                          onClick={() => {
+                            switchServer(server.id);
+                            setShowServerDropdown(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2 flex items-center justify-between gap-2 transition-colors ${isSelected
+                            ? "bg-red-600/15 text-white font-semibold"
+                            : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                            }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? "bg-red-500" : "bg-zinc-600"}`} />
+                            <span className="text-xs truncate">{server.name}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* PROFILE AVATAR DROPDOWN */}
           {isLoggedIn ? (
             <div className="relative" ref={userDropdownRef}>
-              <div 
-                onClick={() => setShowUserDropdown(!showUserDropdown)} 
+              <div
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
                 className="w-8 h-8 rounded overflow-hidden cursor-pointer border border-transparent hover:border-white transition-all active:scale-90 flex-shrink-0"
               >
                 <img src="/avatar.png" className="w-full h-full object-cover" alt="Avatar" />
@@ -232,7 +283,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               )}
             </div>
           ) : (
-            <div 
+            <div
               onClick={() => setShowLoginModal(true)}
               className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center cursor-pointer text-gray-400 hover:text-white border border-zinc-700 transition-all active:scale-90 flex-shrink-0"
             >

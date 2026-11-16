@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
 import { socket } from "@/services/socket.service";
+import { useServer } from "@/context/ServerContext";
 
 // 🛠️ HÀM HELPER: CHUẨN HÓA TÊN TẬP PHIM
 export const formatEpName = (name: string) => {
@@ -29,6 +30,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const [fullMovieDetail, setFullMovieDetail] = useState<any>(null);
   const [isEmbedMode, setIsEmbedMode] = useState<boolean>(true);
+  const { currentServerId, switchServer } = useServer();
 
   const latestTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
@@ -278,22 +280,24 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
       const targetMovieId = String(movie.id || (movie as any)._id || movie.slug);
 
       try {
-        const data = await movieService.getMovieDetail(movie.slug);
-          if (data.movie || data.item) {
-            const rawDetail = data.movie || data.item;
-            const validTitle = rawDetail.name || rawDetail.title || movie.title || (movie as any).name || "";
-            setFullMovieDetail({
-              ...rawDetail,
-              title: validTitle,
-              name: validTitle,
-              poster: rawDetail.poster || rawDetail.poster_url || rawDetail.thumb_url || movie.poster,
-              poster_url: rawDetail.poster_url || rawDetail.thumb_url || rawDetail.poster || movie.poster_url,
-              thumb_url: rawDetail.thumb_url || rawDetail.poster_url || rawDetail.poster || movie.thumb_url,
-              banner: rawDetail.banner || rawDetail.tmdb_backdrop || rawDetail.thumb_url || rawDetail.poster_url || movie.banner
-            });
-          }
+        const data = await movieService.getMovieDetail(movie.slug, currentServerId);
+        if (!data) return;
 
-          setEpisodeData(data.episodes);
+        if (data.movie || data.item) {
+          const rawDetail = data.movie || data.item;
+          const validTitle = rawDetail.name || rawDetail.title || movie.title || (movie as any).name || "";
+          setFullMovieDetail({
+            ...rawDetail,
+            title: validTitle,
+            name: validTitle,
+            poster: rawDetail.poster || rawDetail.poster_url || rawDetail.thumb_url || movie.poster,
+            poster_url: rawDetail.poster_url || rawDetail.thumb_url || rawDetail.poster || movie.poster_url,
+            thumb_url: rawDetail.thumb_url || rawDetail.poster_url || rawDetail.poster || movie.thumb_url,
+            banner: rawDetail.banner || rawDetail.tmdb_backdrop || rawDetail.thumb_url || rawDetail.poster_url || movie.banner
+          });
+        }
+
+        setEpisodeData(data.episodes || []);
           // 🎯 Ưu tiên: server được lưu trong DB history (foundServerName), sau đó mới dùng server từ Watch Party prop
           const targetServerName = (movie as any)?.serverName || (movie as any)?.server_name || "";
           let selectedServer = data.episodes[0];
@@ -460,7 +464,7 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
       }
     };
     fetchFullDetail();
-  }, [movie]);
+  }, [movie, currentServerId]);
 
   // 📊 5. XỬ LÝ TIẾN TRÌNH XEM PHIM ĐỊNH KỲ (BẬT LÁ CHẮN ROOM & ĐĂNG NHẬP)
   const handleProgress = async (currentTime: number) => {
@@ -560,6 +564,10 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     }
   };
 
+  const switchSourceProvider = (providerId: string) => {
+    switchServer(providerId);
+  };
+
   const currentIdx = episodes.findIndex((ep) => ep.slug === activeEpisode);
   const hasNextEpisode = episodes.length > 1 && currentIdx !== -1 && currentIdx < episodes.length - 1;
 
@@ -577,6 +585,9 @@ export function useMovieModalLogic(movie: Movie | null, onClose: () => void) {
     hasNextEpisode,
     isEmbedMode, setIsEmbedMode,
     isHost: isHostRef.current,
+    selectedProvider: currentServerId,
+    providerLoading: false,
+    switchSourceProvider: () => {},
     toggleMyList,
     handleProgress,
     handleNextEpisode,

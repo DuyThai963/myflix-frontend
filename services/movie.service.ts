@@ -1,5 +1,18 @@
+import { Movie } from "@/types/movie";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
   (process.env.NEXT_PUBLIC_BACKEND_URL ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api` : "http://localhost:5000/api");
+
+const getActiveServerId = (): string => {
+  if (typeof window !== "undefined") {
+    try {
+      return localStorage.getItem("myflix_selected_server") || "server_1";
+    } catch {
+      return "server_1";
+    }
+  }
+  return "server_1";
+};
 
 const getImageUrl = (path: string) => {
   if (!path) return "https://placehold.co/600x400/18181b/ffffff?text=No+Image";
@@ -7,26 +20,46 @@ const getImageUrl = (path: string) => {
 };
 
 export const movieService = {
-  getMovies: async () => {
-    const response = await fetch(`${BASE_URL}/home`);
-    const data = await response.json();
-    const items = data?.data?.items || data?.items || [];
+  getMovies: async (serverId: string = getActiveServerId()): Promise<Movie[]> => {
+    // 1. Gọi qua Next.js Proxy Route hỗ trợ 5 server
+    try {
+      const res = await fetch(`/api/proxy-movies?action=home&server=${serverId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      // Bỏ qua lỗi để thử fallback
+    }
 
-    return items.map((movie: any) => ({
-      id: movie._id || movie.id || movie.slug,
-      slug: movie.slug,
-      title: movie.name || movie.title,
-      description: movie.origin_name || "No description",
-      banner: getImageUrl(movie.banner || movie.tmdb_backdrop || movie.thumb_url || movie.poster_url),
-      poster: getImageUrl(movie.poster || movie.poster_url || movie.thumb_url),
-      stream: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-      year: movie.year,
-      duration: movie.time,
-      country: movie.country?.[0]?.name || "Unknown",
-      genre: movie.category?.[0]?.name || "Unknown",
-      episode_current: movie.episode_current,
-      episode_total: movie.episode_total,
-    }));
+    // 2. Fallback sang backend Render nếu proxy nội bộ gặp sự cố
+    try {
+      const response = await fetch(`${BASE_URL}/home`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      const items = data?.data?.items || data?.items || [];
+
+      return items.map((movie: any) => ({
+        id: movie._id || movie.id || movie.slug,
+        slug: movie.slug,
+        title: movie.name || movie.title,
+        description: movie.origin_name || "No description",
+        banner: getImageUrl(movie.banner || movie.tmdb_backdrop || movie.thumb_url || movie.poster_url),
+        poster: getImageUrl(movie.poster || movie.poster_url || movie.thumb_url),
+        stream: "",
+        year: movie.year,
+        duration: movie.time,
+        country: movie.country?.[0]?.name || "Unknown",
+        genre: movie.category?.[0]?.name || "Unknown",
+        episode_current: movie.episode_current,
+        episode_total: movie.episode_total,
+      }));
+    } catch (err) {
+      console.error("Lỗi getMovies fallback:", err);
+      return [];
+    }
   },
 
   getMovieStream: async (slug: string) => {
@@ -39,7 +72,25 @@ export const movieService = {
     return latestEpisode.link_m3u8 || "";
   },
 
-  getMovieDetail: async (slug: string) => {
+  getMovieDetail: async (slug: string, serverId: string = getActiveServerId()) => {
+    // 1. Ưu tiên gọi qua Internal Multi-Source Proxy Route (Hỗ trợ 5 Server Nguồn)
+    try {
+      const proxyRes = await fetch(`/api/proxy-movie?slug=${encodeURIComponent(slug)}&server=${serverId}`);
+      if (proxyRes.ok) {
+        const json = await proxyRes.json();
+        if (json?.data) {
+          return {
+            item: json.data,
+            movie: json.data,
+            episodes: json.data.episodes || []
+          };
+        }
+      }
+    } catch (e) {
+      // Fallback sang backend nếu proxy nội bộ gặp sự cố
+    }
+
+    // 2. Fallback sang backend Render hiện tại (/movie/:slug)
     try {
       const response = await fetch(`${BASE_URL}/movie/${slug}`);
       if (!response.ok) return null;
@@ -67,7 +118,23 @@ export const movieService = {
     }
   },
 
-  searchMovies: async (keyword: string) => {
+  searchMovies: async (keyword: string, serverId: string = getActiveServerId()): Promise<Movie[]> => {
+    if (!keyword.trim()) return [];
+
+    // 1. Gọi qua Next.js Proxy Route hỗ trợ 5 server
+    try {
+      const res = await fetch(`/api/proxy-movies?action=search&keyword=${encodeURIComponent(keyword)}&server=${serverId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data && Array.isArray(json.data)) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    // 2. Fallback sang backend Render
     try {
       const response = await fetch(`${BASE_URL}/search?keyword=${encodeURIComponent(keyword)}`);
       if (!response.ok) return [];
@@ -95,7 +162,21 @@ export const movieService = {
     }
   },
 
-  getMoviesByCategory: async (slug: string, page: number = 1) => {
+  getMoviesByCategory: async (slug: string, page: number = 1, serverId: string = getActiveServerId()): Promise<Movie[]> => {
+    // 1. Gọi qua Next.js Proxy Route hỗ trợ 5 server
+    try {
+      const res = await fetch(`/api/proxy-movies?action=category&slug=${encodeURIComponent(slug)}&page=${page}&server=${serverId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data && Array.isArray(json.data)) {
+          return json.data;
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+
+    // 2. Fallback sang backend Render
     try {
       const listSlugs = [
         "phim-moi", "phim-bo", "phim-le", "shows", "tv-shows", "hoat-hinh", 

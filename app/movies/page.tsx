@@ -6,9 +6,11 @@ import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 import { useEffect, useState, useMemo } from "react";
 
 export default function MoviesPage() {
+  const { currentServerId } = useServer();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [keyword, setKeyword] = useState("");
@@ -19,7 +21,7 @@ export default function MoviesPage() {
   const fetchMovies = async (pageNum: number) => {
     setLoading(true);
     try {
-      const data = await movieService.getMoviesByCategory("phim-le", pageNum);
+      const data = await movieService.getMoviesByCategory("phim-le", pageNum, currentServerId);
       if (data && data.length > 0) {
         setMovies(prev => pageNum === 1 ? data : [...prev, ...data]);
         if (data.length < 10) setHasMore(false);
@@ -34,8 +36,10 @@ export default function MoviesPage() {
   };
 
   useEffect(() => {
+    setPage(1);
+    setHasMore(true);
     fetchMovies(1);
-  }, []);
+  }, [currentServerId]);
 
   // Hàm xử lý khi bấm nút Tải thêm
   const handleLoadMore = () => {

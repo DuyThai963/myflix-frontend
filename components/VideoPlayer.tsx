@@ -34,7 +34,8 @@ function EmbedPlayer({
         src={embedSrc}
         className="w-full h-full border-0"
         allowFullScreen
-        allow="autoplay; encrypted-media; gyroscope; picture-in-picture; screen-wake-lock"
+        {...({ webkitallowfullscreen: "true", mozallowfullscreen: "true" } as any)}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen *; screen-wake-lock *"
       />
     </div>
   );
@@ -118,7 +119,9 @@ export default function VideoPlayer(props: Props) {
     }
   };
 
-  const isEmbedPlayer = props.src && (props.src.includes("player.") || props.src.includes("/player/") || props.src.includes("embed") || props.src.includes("phimapi") || props.src.includes("ophim"));
+  const isEmbedPlayer = props.isEmbed !== undefined
+    ? props.isEmbed
+    : Boolean(props.src && !props.src.includes(".m3u8") && (props.src.includes("player.") || props.src.includes("/player/") || props.src.includes("embed") || props.src.includes("/share/")));
 
   if (isEmbedPlayer) {
     return (

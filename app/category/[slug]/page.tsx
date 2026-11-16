@@ -6,6 +6,7 @@ import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 import { useEffect, useState, use } from "react";
 
 const categoryNames: Record<string, string> = {
@@ -21,6 +22,7 @@ const categoryNames: Record<string, string> = {
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
   const { slug } = resolvedParams;
+  const { currentServerId } = useServer();
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
@@ -34,7 +36,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const fetchCategoryMovies = async (pageNum: number) => {
     setLoading(true);
     try {
-      const data = await movieService.getMoviesByCategory(slug, pageNum);
+      const data = await movieService.getMoviesByCategory(slug, pageNum, currentServerId);
       
       if (data && data.length > 0) {
         // Nếu là trang 1 thì thay mới, nếu trang > 1 thì cộng dồn
@@ -52,12 +54,12 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
     }
   };
 
-  // Reset dữ liệu khi đổi thể loại trên Navbar
+  // Reset dữ liệu khi đổi thể loại hoặc đổi server
   useEffect(() => {
     setPage(1);
     setHasMore(true);
     fetchCategoryMovies(1);
-  }, [slug]);
+  }, [slug, currentServerId]);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;

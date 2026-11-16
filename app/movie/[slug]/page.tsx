@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 import { BsFillPlayFill } from "react-icons/bs";
 import { FaArrowLeft } from "react-icons/fa";
 
@@ -14,6 +15,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ slug: st
   const resolvedParams = use(params);
   const { slug } = resolvedParams;
   const router = useRouter();
+  const { currentServerId } = useServer();
 
   const [movie, setMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ slug: st
     const fetchMovie = async () => {
       setLoading(true);
       try {
-        const data = await movieService.getMovieDetail(slug);
+        const data = await movieService.getMovieDetail(slug, currentServerId);
         if (!isMounted) return;
 
         const movieItem = data?.movie || data?.item;
@@ -60,7 +62,7 @@ export default function MovieDetailPage({ params }: { params: Promise<{ slug: st
     return () => {
       isMounted = false;
     };
-  }, [slug]);
+  }, [slug, currentServerId]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);

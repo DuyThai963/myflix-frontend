@@ -68,7 +68,9 @@ export function useVideoPlayerLogic({
     roomIdRef.current = urlParams.get("room");
   }, []);
 
-  const isEmbedPlayer = src && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("phimapi") || src.includes("ophim"));
+  const isEmbedPlayer = isEmbed !== undefined
+    ? isEmbed
+    : Boolean(src && !src.includes(".m3u8") && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("/share/")));
   useWakeLock(!isEmbedPlayer && isPlaying);
 
   const handleUserInteraction = () => {
@@ -297,10 +299,20 @@ export function useVideoPlayerLogic({
   const toggleFullscreen = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const container = playerContainerRef.current;
+    const video = videoRef.current;
     if (!container) return;
 
     const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
     const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // 📱 Trên iPhone: Gọi trực tiếp webkitEnterFullscreen của iOS AVPlayer
+    // Hệ điều hành Apple kích hoạt phiên toàn màn hình phần cứng, KHÔNG BAO GIỜ TẮT MÀN HÌNH (kể cả Tiết kiệm pin)
+    if (isIPhone && video && typeof (video as any).webkitEnterFullscreen === "function") {
+      try {
+        (video as any).webkitEnterFullscreen();
+        return;
+      } catch (err) {}
+    }
 
     if (isIPhone || isIPad) {
       if (!isFullscreen) {
@@ -577,6 +589,18 @@ export function useVideoPlayerLogic({
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
+
+      const handleNativeBeginFull = () => {
+        setIsFullscreen(true);
+        if (onFullscreenChange) onFullscreenChange(true);
+      };
+      const handleNativeEndFull = () => {
+        setIsFullscreen(false);
+        if (onFullscreenChange) onFullscreenChange(false);
+      };
+      video.addEventListener("webkitbeginfullscreen", handleNativeBeginFull);
+      video.addEventListener("webkitendfullscreen", handleNativeEndFull);
+
       video.addEventListener('loadedmetadata', () => {
         setDuration(video.duration);
         video.currentTime = savedTime;
@@ -592,6 +616,8 @@ export function useVideoPlayerLogic({
       }, { once: true });
       return () => {
         if (video) {
+          video.removeEventListener("webkitbeginfullscreen", handleNativeBeginFull);
+          video.removeEventListener("webkitendfullscreen", handleNativeEndFull);
           video.pause();
           video.removeAttribute('src');
           video.load();
@@ -635,9 +661,11 @@ export function useVideoPlayerLogic({
     }
   }, [src, movieId, movieData]);
 
-  // 🛡️ ĐỒNG BỘ LỊCH SỬ XEM VÀ WATCH PARTY KHỈ CHẠY Ở CHẾ ĐỘ PLAYER EMBED (SERVER 1)
+  // 🛡️ ĐỒNG BỘ LỊCH SỬ XEM VÀ WATCH PARTY KHI CHẠY Ở CHẾ ĐỘ PLAYER EMBED (SERVER 1)
   useEffect(() => {
-    const isEmbedPlayer = src && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("phimapi") || src.includes("ophim"));
+    const isEmbedPlayer = isEmbed !== undefined
+      ? isEmbed
+      : Boolean(src && !src.includes(".m3u8") && (src.includes("player.") || src.includes("/player/") || src.includes("embed") || src.includes("/share/")));
     if (isEmbedPlayer) {
       setLoading(false);
       saveWatchingProgress(initialTime || 0);
@@ -648,7 +676,7 @@ export function useVideoPlayerLogic({
         if (roomId) socket.emit("guest_ready_to_sync", { roomId });
       }
     }
-  }, [src, movieId]);
+  }, [src, movieId, isEmbed]);
 
   // Luồng Polling Sync phòng xem chung
   useEffect(() => {

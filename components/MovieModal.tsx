@@ -153,15 +153,18 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()} 
         className={`bg-[#141414] w-full h-full overflow-hidden flex flex-col relative shadow-[0_0_60px_rgba(0,0,0,0.95)] transition-all duration-300 ${isMaximized ? "rounded-none border-none max-w-none" : "md:h-[90vh] md:max-w-5xl md:rounded-xl border border-zinc-800/80"}`}
+        style={{
+          paddingTop: !isPlayerFullscreen ? "max(0.75rem, env(safe-area-inset-top, 0px))" : undefined
+        }}
       >
         <div 
-          className="absolute right-4 z-50 flex items-center gap-2"
-          style={{ top: 'max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.5rem))' }}
+          className="absolute right-3.5 z-50 flex items-center gap-2"
+          style={{ top: 'max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.4rem))' }}
         >
           <button 
             onClick={() => setIsMaximized(!isMaximized)}
             title={isMaximized ? "Thu nhỏ về cửa sổ" : "Mở rộng vừa khung hình (Chế độ rạp chiếu)"}
-            className="bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400"
+            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm"
           >
             {isMaximized ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -183,7 +186,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
           <button 
             onClick={onClose}
             title="Đóng"
-            className="bg-black/70 hover:bg-zinc-800 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400"
+            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-base md:text-lg transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm"
           >
             ✕
           </button>
@@ -217,8 +220,11 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
 
         {/* Khối hiển thị thông tin chi tiết phim (Thu gọn khi isMaximized) */}
         <div 
-          className={`${isMaximized ? "p-4 md:p-6" : "p-6 md:p-8"} overflow-y-auto z-0 flex-1 overscroll-contain transition-all duration-300`}
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className={`${isMaximized ? "p-4 md:p-6" : "p-5 sm:p-6 md:p-8"} overflow-y-auto z-0 flex-1 overscroll-contain transition-all duration-300`}
+          style={{ 
+            WebkitOverflowScrolling: "touch",
+            paddingBottom: "max(3rem, calc(env(safe-area-inset-bottom, 0px) + 2.5rem))"
+          }}
         >
           <div className="flex flex-col md:flex-row justify-between gap-6 md:gap-8">
             <div className="flex-1">
@@ -234,11 +240,11 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               </div>
 
               {/* Bộ chọn Nguồn Phim (Vietsub / Lồng Tiếng) & Định dạng Trình phát (HLS / Embed) */}
-              <div className={`space-y-2.5 ${isMaximized ? "mb-3" : "mb-6"}`}>
-                {/* 1. Chọn Server Thuyết minh / Vietsub / Lồng tiếng */}
+              <div className={`space-y-3 ${isMaximized ? "mb-3" : "mb-6"}`}>
+                {/* 1. Chọn Bản Dịch / Âm Thanh (Vietsub / Thuyết minh / Lồng tiếng) */}
                 {episodeData.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-zinc-400 mr-1">Nguồn:</span>
+                    <span className="text-xs font-bold text-zinc-400 mr-1 min-w-[50px]">Bản dịch:</span>
                     {episodeData.map((server) => (
                       <button 
                         key={server.server_name} 
@@ -301,9 +307,9 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                   </div>
                 )}
 
-                {/* 2. Chọn Định Dạng Trình Phát (Embed Server 1 vs M3U8 Server 2) */}
+                {/* 3. Chọn Định Dạng Trình Phát (Embed vs M3U8 HLS) */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-zinc-400 mr-1">Player:</span>
+                  <span className="text-xs font-bold text-zinc-400 mr-1 min-w-[50px]">Player:</span>
 
                   {/* Server 1: Embed Player (Ưu tiên ổn định) */}
                   <button

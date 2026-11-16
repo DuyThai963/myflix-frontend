@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { socket } from "@/services/socket.service";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 import { Movie } from "@/types/movie";
 
 export function useHomeLogic() {
@@ -17,17 +18,19 @@ export function useHomeLogic() {
   const [isIntroLoading, setIsIntroLoading] = useState(true);
   const [mountIntro, setMountIntro] = useState(false);
   const [isMoviesLoading, setIsMoviesLoading] = useState(true);
+  const { currentServerId } = useServer();
 
-  // 🎬 2. LUỒNG FETCH SONG SONG CÁC DANH MỤC PHIM TRANG CHỦ
+  // 🎬 2. LUỒNG FETCH SONG SONG CÁC DANH MỤC PHIM TRANG CHỦ THEO SERVER HIỆN TẠI
   useEffect(() => {
     const fetchMovies = async () => {
+      setIsMoviesLoading(true);
       try {
         const [homeRes, boRes, leRes, hhRes, tvRes] = await Promise.allSettled([
-          movieService.getMovies(),
-          movieService.getMoviesByCategory("phim-bo"),
-          movieService.getMoviesByCategory("phim-le"),
-          movieService.getMoviesByCategory("hoat-hinh"),
-          movieService.getMoviesByCategory("tv-shows")
+          movieService.getMovies(currentServerId),
+          movieService.getMoviesByCategory("phim-bo", 1, currentServerId),
+          movieService.getMoviesByCategory("phim-le", 1, currentServerId),
+          movieService.getMoviesByCategory("hoat-hinh", 1, currentServerId),
+          movieService.getMoviesByCategory("tv-shows", 1, currentServerId)
         ]);
 
         if (homeRes.status === "fulfilled" && Array.isArray(homeRes.value)) setMovies(homeRes.value);
@@ -42,7 +45,7 @@ export function useHomeLogic() {
       }
     };
     fetchMovies();
-  }, []);
+  }, [currentServerId]);
 
   // 🍿 3. LUỒNG KIỂM SOÁT INTRO SCREEN
   useEffect(() => {

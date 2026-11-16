@@ -6,9 +6,11 @@ import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
 import { movieService } from "@/services/movie.service";
+import { useServer } from "@/context/ServerContext";
 import { useEffect, useState } from "react";
 
 export default function TvShowsPage() {
+  const { currentServerId } = useServer();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [keyword, setKeyword] = useState("");
@@ -19,7 +21,7 @@ export default function TvShowsPage() {
   const fetchMovies = async (pageNum: number) => {
     setLoading(true);
     try {
-      const data = await movieService.getMoviesByCategory("phim-bo", pageNum);
+      const data = await movieService.getMoviesByCategory("phim-bo", pageNum, currentServerId);
       if (data && data.length > 0) {
         setMovies(prev => pageNum === 1 ? data : [...prev, ...data]);
         if (data.length < 10) setHasMore(false);
@@ -34,8 +36,10 @@ export default function TvShowsPage() {
   };
 
   useEffect(() => {
+    setPage(1);
+    setHasMore(true);
     fetchMovies(1);
-  }, []);
+  }, [currentServerId]);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;
