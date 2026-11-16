@@ -33,17 +33,15 @@ export default function NetflixAuthGate({ children }: { children: React.ReactNod
       const cleanUsername = username.trim();
       const cleanPassword = password.trim();
 
-      // Kích hoạt Credential Management API cho trình duyệt Chrome/Safari/Edge
-      if (typeof window !== "undefined" && "PasswordCredential" in window) {
+      // Kích hoạt Credential Management API cho trình duyệt (Non-blocking, không chặn UI)
+      if (typeof window !== "undefined" && "PasswordCredential" in window && navigator.credentials?.store) {
         try {
           const cred = new (window as any).PasswordCredential({
             id: cleanUsername,
             password: cleanPassword,
             name: cleanUsername,
           });
-          if (navigator.credentials && navigator.credentials.store) {
-            await navigator.credentials.store(cred);
-          }
+          navigator.credentials.store(cred).catch(() => {});
         } catch (credErr) {
           // Bỏ qua nếu trình duyệt chặn
         }

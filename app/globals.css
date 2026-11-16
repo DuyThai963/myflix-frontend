@@ -31,11 +31,13 @@ h1, h2, h3, p,
   display: none;
 }
 
+/* TỐI ƯU HIỂN THỊ THẺ PHIM ĐA THIẾT BỊ (LINH HOẠT THEO THIẾT BỊ) */
 .info-overlay, 
 .remove-btn {
   opacity: 1 !important;
 }
 
+/* Trên PC (Chuột): Giữ nguyên giao diện sạch, chỉ hiện chữ và nút khi HOVER hoặc FOCUS bằng phím */
 @media (pointer: fine) {
   .info-overlay, 
   .remove-btn {
@@ -44,9 +46,18 @@ h1, h2, h3, p,
   }
   
   .group:hover .info-overlay, 
-  .group:hover .remove-btn {
+  .group:hover .remove-btn,
+  .group:focus-visible .info-overlay,
+  .group:focus-visible .remove-btn,
+  .group:focus-within .info-overlay,
+  .group:focus-within .remove-btn {
     opacity: 1 !important;
   }
+}
+
+/* HIỆU ỨNG FOCUS CHO REMOTE ANDROID TV / MÁY CHIẾU */
+:focus-visible {
+  outline: none;
 }
 
 /* 3. TỐI ƯU CUỘN TRƯỢT CHO THIẾT BỊ CẢM ỨNG (Gom gọn làm một) */

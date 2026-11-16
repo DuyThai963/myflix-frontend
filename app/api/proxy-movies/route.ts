@@ -3,6 +3,10 @@ import { getParserById } from "@/services/movieAdapters";
 
 export const dynamic = "force-dynamic";
 
+// ⚡ BỘ ĐỆM RAM IN-MEMORY CACHE (Server-side): Phản hồi dưới 1ms cho các lượt gọi trùng
+const serverCache = new Map<string, { data: any; expiry: number }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -11,6 +15,19 @@ export async function GET(req: NextRequest) {
     const slug = searchParams.get("slug") || "";
     const keyword = searchParams.get("keyword") || "";
     const page = parseInt(searchParams.get("page") || "1", 10) || 1;
+
+    const cacheKey = `${serverId}_${action}_${slug}_${keyword}_${page}`;
+    const now = Date.now();
+    const cached = serverCache.get(cacheKey);
+
+    if (cached && cached.expiry > now) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1200",
+          "X-Cache": "HIT"
+        }
+      });
+    }
 
     const parser = getParserById(serverId);
     let targetUrl = "";
@@ -32,15 +49,14 @@ export async function GET(req: NextRequest) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 6000); // 6s timeout tránh treo
 
     const res = await fetch(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json"
       },
-      signal: controller.signal,
-      next: { revalidate: 300 } // Cache 5 phút
+      signal: controller.signal
     });
 
     clearTimeout(timeout);
@@ -54,7 +70,7 @@ export async function GET(req: NextRequest) {
     const rawJson = await res.json();
     const items = parser.parseList(rawJson);
 
-    return NextResponse.json({
+    const payload = {
       status: true,
       server: {
         id: parser.id,
@@ -62,6 +78,22 @@ export async function GET(req: NextRequest) {
         type: parser.type
       },
       data: items
+    };
+
+    // Lưu vào RAM cache
+    serverCache.set(cacheKey, { data: payload, expiry: now + CACHE_TTL_MS });
+
+    // Dọn dẹp cache nếu vượt quá 500 mục
+    if (serverCache.size > 500) {
+      const firstKey = serverCache.keys().next().value;
+      if (firstKey) serverCache.delete(firstKey);
+    }
+
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1200",
+        "X-Cache": "MISS"
+      }
     });
   } catch (error: any) {
     return NextResponse.json({

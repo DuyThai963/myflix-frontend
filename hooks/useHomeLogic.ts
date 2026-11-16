@@ -47,31 +47,26 @@ export function useHomeLogic() {
     fetchMovies();
   }, [currentServerId]);
 
-  // 🍿 3. LUỒNG KIỂM SOÁT INTRO SCREEN
+  // 🍿 3. LUỒNG KIỂM SOÁT INTRO SCREEN (Tối ưu tốc độ mở web)
   useEffect(() => {
-    const hasSeenIntro = sessionStorage.getItem("myflix_has_seen_intro");
-    if (!hasSeenIntro) {
-      setMountIntro(true);
-      const introTimer = setTimeout(() => {
+    try {
+      const hasSeenIntro = localStorage.getItem("myflix_has_seen_intro");
+      if (!hasSeenIntro) {
+        setMountIntro(true);
+        const introTimer = setTimeout(() => {
+          setIsIntroLoading(false);
+          localStorage.setItem("myflix_has_seen_intro", "true");
+        }, 1200);
+        return () => clearTimeout(introTimer);
+      } else {
         setIsIntroLoading(false);
-        sessionStorage.setItem("myflix_has_seen_intro", "true");
-      }, 2500);
-      return () => clearTimeout(introTimer);
-    } else {
+        setMountIntro(false); 
+      }
+    } catch {
       setIsIntroLoading(false);
-      setMountIntro(false); 
+      setMountIntro(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (isIntroLoading) {
-      sessionStorage.setItem("myflix_has_seen_intro", "true");
-      const introTimer = setTimeout(() => {
-        setIsIntroLoading(false);
-      }, 2500);
-      return () => clearTimeout(introTimer);
-    }
-  }, [isIntroLoading]);
 
   // 📚 4. LUỒNG QUẢN LÝ LỊCH SỬ XEM (ĐÃ ĐỒNG BỘ MAPPING LÀM SẠCH ẢNH POSTER)
   useEffect(() => {

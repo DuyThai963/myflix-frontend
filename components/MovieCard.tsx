@@ -80,11 +80,22 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
     onClick();
   };
 
+  // [Design Read] Cinematic tactile card with persistent metadata gradient, high-contrast drop shadows, and high-visibility TV remote focus ring.
   return (
     <Link
       ref={cardRef} // Gắn ref để kích hoạt bộ bẫy chống zoom Native
       href={movieUrl}
       onClick={handleClick}
+      tabIndex={0}
+      data-tv-card="true"
+      onFocus={(e) => {
+        // Tự động cuộn mượt vào giữa vùng nhìn thấy khi remote D-Pad điều hướng tới
+        try {
+          e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        } catch {
+          e.currentTarget.scrollIntoView();
+        }
+      }}
       className="
         block
         relative
@@ -92,7 +103,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         aspect-[2/3] 
         rounded-md
         overflow-hidden
-        transition-transform
+        transition-all
         duration-300
         cursor-pointer
         bg-zinc-900
@@ -100,10 +111,17 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         transform-gpu
         backface-hidden
         
-        /* CHUẨN TAILWIND HOVER: Chỉ tương tác khi dùng chuột ở PC/Máy chiếu */
-        @media:pointer-fine:hover:scale-105 
-        @media:pointer-fine:hover:z-50 
-        @media:pointer-fine:hover:shadow-2xl
+        /* HOVER PC & FOCUS TV REMOTE */
+        hover:scale-105 
+        hover:z-30 
+        hover:shadow-2xl
+        focus:outline-none
+        focus-visible:outline-none
+        focus-visible:ring-4
+        focus-visible:ring-red-600
+        focus-visible:scale-105
+        focus-visible:z-40
+        focus-visible:shadow-[0_0_25px_rgba(229,9,20,0.8)]
 
         /* CHÌA KHÓA: Cho phép vuốt ngang list phim thoải mái, nhưng không cho phép zoom */
         touch-pan-x touch-pan-y
@@ -121,12 +139,13 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         <div 
           className={`
             absolute top-2 left-2 ${tag.color} text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-20
-            transition-opacity duration-300
-            /* Mặc định là hiện (Mobile/Máy chiếu) */
+            transition-all duration-200
+            /* Mặc định hiện trên thiết bị cảm ứng Mobile/Tablet */
             opacity-100
-            /* Trên PC (có chuột), ẩn đi và chờ hover */
+            /* Trên PC (có chuột), ẩn đi và chỉ hiện khi HOVER chuột hoặc FOCUS bằng Remote TV/Phím */
             [@media(pointer:fine)]:opacity-0 
-            group-hover:opacity-100
+            group-hover:opacity-100 
+            group-focus-visible:opacity-100
           `}
         >
           {tag.text}
@@ -158,6 +177,7 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
       {onRemove && (
         <button
           type="button"
+          tabIndex={-1}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -174,23 +194,23 @@ export default function MovieCard({ movie, onClick, onRemove }: Props) {
         </button>
       )}
 
-      {/* Overlay thông tin - Giữ nguyên vẹn */}
+      {/* Overlay thông tin - Luôn hiện tên phim và năm, rõ nét trên máy chiếu & TV */}
       <div
         className="
           info-overlay
-          absolute inset-0 z-10 bg-gradient-to-t from-black/95 via-black/20 to-transparent
+          absolute inset-0 z-10 bg-gradient-to-t from-black/95 via-black/35 to-transparent
           transition-opacity duration-300 flex flex-col justify-end p-2.5
         "
       >
         <div className="transform transition-transform duration-300">
-          <h3 className="font-bold text-[13px] md:text-sm text-white truncate leading-tight drop-shadow-lg">
+          <h3 className="font-bold text-[13px] md:text-sm text-white truncate leading-tight drop-shadow-lg group-hover:text-red-400 group-focus-visible:text-red-400 transition-colors">
             {movie.title}
           </h3>
 
           <p className="text-[10px] text-gray-300 mt-1 font-medium flex items-center gap-2">
             <span className="text-green-500 font-bold">{movie.year}</span> 
             <span className="opacity-60">|</span>
-            <span className="truncate">
+            <span className="truncate opacity-80 group-hover:opacity-100 group-focus-visible:opacity-100">
               {typeof (movie as any).genre === "object" 
                 ? (Array.isArray((movie as any).genre) ? (movie as any).genre.map((g: any) => (typeof g === "object" ? g?.name || "" : g)).filter(Boolean).join(", ") : (movie as any).genre?.name || "") 
                 : (movie.genre || "")}

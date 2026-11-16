@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 🔄 Kiểm tra token khởi tạo từ localStorage khi client mount
+  // 🔄 Kiểm tra token khởi tạo từ localStorage khi client mount & Kích hoạt đánh thức Backend sớm
   useEffect(() => {
     try {
       const savedToken = localStorage.getItem("myflix_token");
@@ -71,9 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+
+    // ⚡ PRE-WARM BACKEND (Render Cold-Start Defense):
+    // Đánh thức Render server dậy ngầm ngay khi mở trang web / app để khi người dùng bấm Đăng nhập là server đã sẵn sàng 100%!
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://dtmyflix.onrender.com";
+      fetch(`${backendUrl}/api/ping`, { method: "GET" }).catch(() => {});
+    } catch {}
   }, []);
 
-  // 🔐 Hàm Xử lý Đăng Nhập
+  // 🔐 Hàm Xử lý Đăng Nhập Siêu Tốc
   const login = async (usernameInput: string, passwordInput: string): Promise<boolean> => {
     setAuthError(null);
     const cleanUsername = usernameInput.trim();
@@ -85,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://dtmyflix.onrender.com";
       const res = await fetch(`${backendUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,32 +106,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Lưu hộ chiếu danh tính
+      // 1. Lưu hộ chiếu danh tính & KÍCH HOẠT ĐĂNG NHẬP NGAY LẬP TỨC (0ms chờ đợi)
       localStorage.setItem("myflix_token", data.token);
       localStorage.setItem("myflix_user", JSON.stringify(data.user));
 
-      // Luồng cứu hộ dữ liệu lịch sử xem local cũ đẩy lên DB
+      setToken(data.token);
+      setUser(data.user);
+      setIsLoggedIn(true);
+
+      // 2. Luồng cứu hộ dữ liệu lịch sử xem local cũ: Chạy ngầm trong background (NON-BLOCKING)
+      // KHÔNG bắt người dùng phải đợi sync xong mới được vào ứng dụng!
       const localHist = localStorage.getItem("myflix_history");
       if (localHist) {
         try {
           const parsedHist = JSON.parse(localHist);
-          if (parsedHist.length > 0) {
-            await fetch(`${backendUrl}/api/history/sync`, {
+          if (Array.isArray(parsedHist) && parsedHist.length > 0) {
+            fetch(`${backendUrl}/api/history/sync`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ userId: data.user.id, localHistory: parsedHist })
-            });
-            localStorage.removeItem("myflix_history");
+            })
+              .then(() => {
+                localStorage.removeItem("myflix_history");
+                window.dispatchEvent(new Event("myflix_history_updated"));
+              })
+              .catch((syncErr) => {
+                console.error("❌ Lỗi sync mảng lịch sử ngầm:", syncErr);
+              });
           }
         } catch (syncErr) {
-          console.error("❌ Lỗi sync mảng lịch sử:", syncErr);
+          console.error("❌ Lỗi đọc lịch sử cũ:", syncErr);
         }
+      } else {
+        window.dispatchEvent(new Event("myflix_history_updated"));
       }
 
-      window.dispatchEvent(new Event("myflix_history_updated"));
-      setToken(data.token);
-      setUser(data.user);
-      setIsLoggedIn(true);
       return true;
     } catch (err) {
       setAuthError("Không thể kết nối tới Server Backend!");

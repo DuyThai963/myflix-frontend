@@ -72,7 +72,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
 
           <div className="hidden md:flex gap-6 text-sm font-medium items-center text-gray-300">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
+              <Link key={link.href} href={link.href} className="focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded px-1.5 py-0.5">
                 <span className={`cursor-pointer transition-colors duration-200 ${pathname === link.href ? "text-white font-bold" : "hover:text-white"
                   }`}>
                   {link.name}
@@ -87,8 +87,16 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               onMouseLeave={() => { if (window.matchMedia('(pointer: fine)').matches) setShowDropdown(false); }}
             >
               <div
+                tabIndex={0}
+                role="button"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setShowDropdown(!showDropdown);
+                  }
+                }}
                 onClick={(e) => { e.preventDefault(); setShowDropdown(!showDropdown); }}
-                className={`cursor-pointer flex items-center gap-1 transition-colors duration-200 ${pathname.includes("/category") || showDropdown ? "text-white font-bold" : "hover:text-white"
+                className={`cursor-pointer flex items-center gap-1 transition-colors duration-200 rounded px-1.5 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 ${pathname.includes("/category") || showDropdown ? "text-white font-bold" : "hover:text-white"
                   }`}
               >
                 Categories
@@ -100,7 +108,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                   <div className="bg-black/95 border border-zinc-800 rounded-md py-2 shadow-2xl flex flex-col relative">
                     <div className="absolute -top-1.5 left-8 w-3 h-3 bg-black border-t border-l border-zinc-800 transform rotate-45"></div>
                     {categories.map((cat) => (
-                      <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setShowDropdown(false)}>
+                      <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setShowDropdown(false)} className="focus:outline-none focus-visible:bg-red-600">
                         <span className="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-zinc-800 transition-colors">
                           {cat.name}
                         </span>
@@ -127,14 +135,18 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                 autoFocus
               />
             )}
-            <FaSearch
-              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg active:scale-90"
+            <button
+              type="button"
+              tabIndex={0}
+              className="cursor-pointer text-gray-300 hover:text-white transition-colors text-lg active:scale-90 p-1 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowSearch(!showSearch);
                 setShowSuggestions(!showSearch);
               }}
-            />
+            >
+              <FaSearch />
+            </button>
 
             {showSuggestions && (keyword.trim().length >= 2 || searchHistory.length > 0) && (
               <div className="absolute top-full right-0 mt-2 w-[280px] sm:w-[350px] bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-50">
@@ -152,8 +164,17 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                       {suggestions.map((movie) => (
                         <div
                           key={movie._id || movie.slug}
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleSearchSubmit(movie.name);
+                              setShowSuggestions(false);
+                            }
+                          }}
                           onClick={() => { handleSearchSubmit(movie.name); setShowSuggestions(false); }}
-                          className="flex items-center gap-2 p-1.5 hover:bg-zinc-900 rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
+                          className="flex items-center gap-2 p-1.5 hover:bg-zinc-800 focus:bg-zinc-800 focus:outline-none rounded cursor-pointer transition-colors border-b border-zinc-900/50 last:border-0"
                         >
                           <img
                             src={movie.thumb_url || "https://placehold.co/600x400/18181b/ffffff?text=No+Image"}
@@ -261,12 +282,14 @@ export default function Navbar({ keyword, setKeyword }: Props) {
           {/* PROFILE AVATAR DROPDOWN */}
           {isLoggedIn ? (
             <div className="relative" ref={userDropdownRef}>
-              <div
+              <button
+                type="button"
+                tabIndex={0}
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="w-8 h-8 rounded overflow-hidden cursor-pointer border border-transparent hover:border-white transition-all active:scale-90 flex-shrink-0"
+                className="w-8 h-8 rounded overflow-hidden cursor-pointer border border-transparent hover:border-white focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition-all active:scale-90 flex-shrink-0"
               >
                 <img src="/avatar.png" className="w-full h-full object-cover" alt="Avatar" />
-              </div>
+              </button>
 
               {showUserDropdown && (
                 <div className="absolute top-full right-0 w-40 pt-3 z-[100] animate-in fade-in zoom-in-95 duration-200">
@@ -275,7 +298,7 @@ export default function Navbar({ keyword, setKeyword }: Props) {
                     <div className="px-4 py-2 border-b border-zinc-900 text-xs font-semibold text-zinc-400 truncate">
                       Hi, <span className="text-white font-bold">{currentUsername}</span>
                     </div>
-                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-red-600/20 hover:font-semibold transition-colors mt-1">
+                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-red-600/20 hover:font-semibold transition-colors mt-1 focus:outline-none focus-visible:bg-red-600">
                       Đăng xuất
                     </button>
                   </div>
@@ -283,12 +306,14 @@ export default function Navbar({ keyword, setKeyword }: Props) {
               )}
             </div>
           ) : (
-            <div
+            <button
+              type="button"
+              tabIndex={0}
               onClick={() => setShowLoginModal(true)}
-              className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center cursor-pointer text-gray-400 hover:text-white border border-zinc-700 transition-all active:scale-90 flex-shrink-0"
+              className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center cursor-pointer text-gray-400 hover:text-white border border-zinc-700 transition-all active:scale-90 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
             >
               <FaUserAlt className="text-xs" />
-            </div>
+            </button>
           )}
         </div>
       </div>

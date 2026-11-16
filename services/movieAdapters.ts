@@ -1,11 +1,11 @@
 /**
  * Architecture: Strategy & Adapter Pattern for Movie Providers
  * 
- * Thứ tự các Server nguồn phim:
- * 1. Server 1: VsMov (https://vsmov.com/api - Embed: streamvsmov.com 200 OK)
- * 2. Server 2: VodPhim (https://api.xink.pro/api/content - Embed: playembed.vip 200 OK)
- * 3. Server 3: KKPhim (https://phimapi.com - Embed: 200 OK)
- * 4. Server 4: OPhim (https://ophim1.com - Server đã ngừng hoạt động từ cuối 2024)
+ * Thứ tự các Server nguồn phim chuẩn (KKPhim làm nguồn chính 100%):
+ * 1. Server 1: KKPhim (https://phimapi.com - PhimAPI 200 OK) -> NGUỒN CHÍNH MẶC ĐỊNH
+ * 2. Server 2: VsMov (https://vsmov.com/api - Embed: streamvsmov.com 200 OK)
+ * 3. Server 3: VodPhim (https://api.xink.pro/api/content - Embed: playembed.vip 200 OK)
+ * 4. Server 4: OPhim (https://ophim1.com - Server dự phòng / ngừng hoạt động)
  */
 
 import { Movie } from "@/types/movie";
@@ -345,11 +345,42 @@ export abstract class Type2Parser implements MovieSourceParser {
   }
 }
 
-// 1. Server 1: VsMov (https://vsmov.com/api - Embed: streamvsmov.com 200 OK)
-export class VsMovParser extends Type2Parser {
+// 1. Server 1: KKPhim (https://phimapi.com - PhimAPI - Nguồn chính 100%)
+export class KKPhimParser extends Type2Parser {
   readonly id = "server_1";
-  readonly name = "Server 1 (VsMov)";
+  readonly name = "Server 1 (KKPhim)";
   readonly shortName = "Server 1";
+  readonly code = "kkphim";
+  readonly baseUrl = "https://phimapi.com";
+  readonly cdnImage = "https://phimimg.com";
+
+  override getHomeUrl(page: number = 1): string {
+    return `${this.baseUrl}/danh-sach/phim-moi-cap-nhat?page=${page}`;
+  }
+
+  override getListUrl(slug: string, page: number = 1): string {
+    const listSlugs = [
+      "phim-bo", "phim-le", "hoat-hinh", "tv-shows", "shows", 
+      "phim-moi", "phim-chieu-rap", "phim-dang-chieu", "subteam"
+    ];
+    const endpoint = listSlugs.includes(slug) ? "danh-sach" : "the-loai";
+    return `${this.baseUrl}/v1/api/${endpoint}/${slug}?page=${page}`;
+  }
+
+  override getSearchUrl(keyword: string, page: number = 1): string {
+    return `${this.baseUrl}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`;
+  }
+
+  override getDetailUrl(slug: string): string {
+    return `${this.baseUrl}/phim/${slug}`;
+  }
+}
+
+// 2. Server 2: VsMov (https://vsmov.com/api - Embed: streamvsmov.com 200 OK)
+export class VsMovParser extends Type2Parser {
+  readonly id = "server_2";
+  readonly name = "Server 2 (VsMov)";
+  readonly shortName = "Server 2";
   readonly code = "vsmov";
   readonly baseUrl = "https://vsmov.com/api";
   readonly cdnImage = "https://nguon.vsphim.com/storage/images/";
@@ -394,11 +425,11 @@ export class VsMovParser extends Type2Parser {
   }
 }
 
-// 2. Server 2: VodPhim (https://api.xink.pro/api/content - Embed: playembed.vip 200 OK)
+// 3. Server 3: VodPhim (https://api.xink.pro/api/content - Embed: playembed.vip 200 OK)
 export class VodPhimParser extends Type2Parser {
-  readonly id = "server_2";
-  readonly name = "Server 2 (VodPhim)";
-  readonly shortName = "Server 2";
+  readonly id = "server_3";
+  readonly name = "Server 3 (VodPhim)";
+  readonly shortName = "Server 3";
   readonly code = "vodphim";
   readonly baseUrl = "https://api.xink.pro/api/content";
   readonly cdnImage = "";
@@ -443,37 +474,6 @@ export class VodPhimParser extends Type2Parser {
   }
 }
 
-// 3. Server 3: KKPhim (PhimAPI)
-export class KKPhimParser extends Type2Parser {
-  readonly id = "server_3";
-  readonly name = "Server 3 (KKPhim)";
-  readonly shortName = "Server 3";
-  readonly code = "kkphim";
-  readonly baseUrl = "https://phimapi.com";
-  readonly cdnImage = "https://phimimg.com";
-
-  override getHomeUrl(page: number = 1): string {
-    return `${this.baseUrl}/danh-sach/phim-moi-cap-nhat?page=${page}`;
-  }
-
-  override getListUrl(slug: string, page: number = 1): string {
-    const listSlugs = [
-      "phim-bo", "phim-le", "hoat-hinh", "tv-shows", "shows", 
-      "phim-moi", "phim-chieu-rap", "phim-dang-chieu", "subteam"
-    ];
-    const endpoint = listSlugs.includes(slug) ? "danh-sach" : "the-loai";
-    return `${this.baseUrl}/v1/api/${endpoint}/${slug}?page=${page}`;
-  }
-
-  override getSearchUrl(keyword: string, page: number = 1): string {
-    return `${this.baseUrl}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`;
-  }
-
-  override getDetailUrl(slug: string): string {
-    return `${this.baseUrl}/phim/${slug}`;
-  }
-}
-
 // 4. Server 4: OPhim (Dự phòng)
 export class OPhimParser extends Type2Parser {
   readonly id = "server_4";
@@ -496,17 +496,17 @@ export class OPhimParser extends Type2Parser {
 /**
  * ========================================================
  * REGISTRY DANH SÁCH 3 SERVERS HOẠT ĐỘNG CHÍNH THỨC:
- * 1. Server 1: VsMov (vsmov.com - StreamVsMov 200 OK)
- * 2. Server 2: VodPhim (api.xink.pro - PlayEmbed.vip 200 OK)
- * 3. Server 3: KKPhim (phimapi.com - PhimAPI 200 OK)
+ * 1. Server 1: KKPhim (phimapi.com - PhimAPI 200 OK) -> NGUỒN CHÍNH MẶC ĐỊNH
+ * 2. Server 2: VsMov (vsmov.com - StreamVsMov 200 OK)
+ * 3. Server 3: VodPhim (api.xink.pro - PlayEmbed.vip 200 OK)
  * ========================================================
  */
 export const MOVIE_SERVERS: MovieSourceParser[] = [
-  new VsMovParser(),   // 1. VsMov
-  new VodPhimParser(), // 2. VodPhim
-  new KKPhimParser(),  // 3. KKPhim
+  new KKPhimParser(),  // 1. KKPhim (Nguồn chính 100%)
+  new VsMovParser(),   // 2. VsMov
+  new VodPhimParser(), // 3. VodPhim
 ];
 
 export const getParserById = (id: string): MovieSourceParser => {
-  return MOVIE_SERVERS.find((s) => s.id === id) || MOVIE_SERVERS[0];
+  return MOVIE_SERVERS.find((s) => s.id === id || s.code === id) || MOVIE_SERVERS[0];
 };

@@ -387,14 +387,56 @@ export function useVideoPlayerLogic({
       if (!videoRef.current) return;
 
       const key = e.key.toLowerCase();
+      const isButtonOrLink = activeEl?.tagName === "BUTTON" || activeEl?.tagName === "A";
 
-      if (e.code === "Space" || key === " " || key === "k") {
+      // 🛡️ BẢO VỆ ĐIỀU HƯỚNG REMOTE ANDROID TV / MÁY CHIẾU:
+      // Khi người dùng đang focus vào nút bấm trong Modal (Tập phim, Server, Đóng, Chế độ rạp chiếu),
+      // TUYỆT ĐỐI KHÔNG chặn phím mũi tên và Space/Enter để remote TV tự do di chuyển giữa các nút!
+      if (!isFullscreen && isButtonOrLink) {
+        // Chỉ xử lý phím F (fullscreen) hoặc M (mute) nếu không phải phím điều hướng
+        if (key === "f") {
+          e.preventDefault();
+          toggleFullscreen();
+        } else if (key === "m") {
+          e.preventDefault();
+          toggleMute();
+        }
+        return;
+      }
+
+      const isSeekForward =
+        key === "arrowright" ||
+        key === ">" ||
+        key === "." ||
+        key === "l" ||
+        e.keyCode === 228 ||
+        e.key === "MediaFastForward" ||
+        e.key === "MediaTrackNext";
+
+      const isSeekBackward =
+        key === "arrowleft" ||
+        key === "<" ||
+        key === "," ||
+        key === "j" ||
+        e.keyCode === 227 ||
+        e.key === "MediaRewind" ||
+        e.key === "MediaTrackPrevious";
+
+      const isPlayPause =
+        e.code === "Space" ||
+        key === " " ||
+        key === "k" ||
+        key === "mediaplaypause" ||
+        e.keyCode === 179 ||
+        e.keyCode === 85;
+
+      if (isPlayPause) {
         e.preventDefault();
         togglePlay();
-      } else if (key === "arrowright") {
+      } else if (isSeekForward) {
         e.preventDefault();
         skipTime(null, 10);
-      } else if (key === "arrowleft") {
+      } else if (isSeekBackward) {
         e.preventDefault();
         skipTime(null, -10);
       } else if (key === "arrowup") {

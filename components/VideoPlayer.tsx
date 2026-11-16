@@ -14,6 +14,11 @@ function EmbedPlayer({
   containerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   useWakeLock(true);
+  const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsIframeLoaded(false);
+  }, [src]);
 
   let embedSrc = src;
   if (initialTime && initialTime > 0) {
@@ -24,14 +29,24 @@ function EmbedPlayer({
     }
   }
 
+  // [Design Read] Clean embed container with feedback loading state, preventing blank black freezes on upstream latency.
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center"
+      tabIndex={0}
+      data-tv-embed="true"
+      className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
     >
+      {!isIframeLoaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-black/80 pointer-events-none">
+          <div className="w-10 h-10 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin mb-2" />
+          <span className="text-xs text-zinc-400 font-medium animate-pulse">Đang kết nối trình phát Embed...</span>
+        </div>
+      )}
       <iframe
         key={src}
         src={embedSrc}
+        onLoad={() => setIsIframeLoaded(true)}
         className="w-full h-full border-0"
         allowFullScreen
         {...({ webkitallowfullscreen: "true", mozallowfullscreen: "true" } as any)}
@@ -136,10 +151,12 @@ export default function VideoPlayer(props: Props) {
   return (
     <div
       ref={playerContainerRef}
+      tabIndex={0}
+      data-tv-player="true"
       onMouseMove={handleUserInteraction}
       onMouseLeave={() => !isDragging && isPlaying && setShowControls(false)}
       onTouchEnd={() => { setIsDragging(false); if (isPlaying) handleUserInteraction(); }}
-      className="relative w-full h-full bg-black overflow-hidden group flex items-center justify-center select-none font-sans cursor-default"
+      className="relative w-full h-full bg-black overflow-hidden group flex items-center justify-center select-none font-sans cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
     >
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/60 pointer-events-none">

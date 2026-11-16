@@ -1,51 +1,30 @@
 "use client";
 
+// [Design Read] Clean dark cinematic grid layout for series with pre-fetched background pagination and accessible TV D-pad focus states.
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
-import { movieService } from "@/services/movie.service";
 import { useServer } from "@/context/ServerContext";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePrefetchPagination } from "@/hooks/usePrefetchPagination";
 
 export default function TvShowsPage() {
   const { currentServerId } = useServer();
-  const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [keyword, setKeyword] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
 
-  const fetchMovies = async (pageNum: number) => {
-    setLoading(true);
-    try {
-      const data = await movieService.getMoviesByCategory("phim-bo", pageNum, currentServerId);
-      if (data && data.length > 0) {
-        setMovies(prev => pageNum === 1 ? data : [...prev, ...data]);
-        if (data.length < 10) setHasMore(false);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error("Lỗi fetch phim bộ:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setPage(1);
-    setHasMore(true);
-    fetchMovies(1);
-  }, [currentServerId]);
-
-  const handleLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchMovies(nextPage);
-  };
+  const {
+    movies,
+    loading,
+    hasMore,
+    handleLoadMore,
+    sentinelRef,
+  } = usePrefetchPagination({
+    categorySlug: "phim-bo",
+    currentServerId,
+  });
 
   return (
     <main className="bg-black min-h-screen text-white flex flex-col">
@@ -72,13 +51,13 @@ export default function TvShowsPage() {
           </div>
         ) : null}
 
-        {/* Nút Tải thêm */}
+        {/* Nút Xem thêm - Tự động tải trước dữ liệu ngầm khi lướt gần tới, click hiển thị 0ms */}
         {hasMore && (
-          <div className="flex justify-center mt-12 mb-8">
+          <div ref={sentinelRef} className="flex justify-center mt-12 mb-8">
             <button
               onClick={handleLoadMore}
               disabled={loading}
-              className="bg-red-600 text-white px-8 py-2 rounded-md font-bold hover:bg-red-700 transition disabled:bg-zinc-800 disabled:text-zinc-500 cursor-pointer"
+              className="bg-red-600 text-white px-8 py-2.5 rounded-md font-bold hover:bg-red-700 transition disabled:bg-zinc-800 disabled:text-zinc-500 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:scale-105 active:scale-95 shadow-lg"
             >
               {loading ? (
                 <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ZoomBlocker from "@/components/ZoomBlocker"; // IMPORT THẰNG NÀY VÀO
+import TVNavigationProvider from "@/components/TVNavigationProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ServerProvider } from "@/context/ServerContext";
@@ -60,6 +61,7 @@ export default function RootLayout({
           <ServerProvider>
             <NetflixAuthGate>
               <ZoomBlocker /> 
+              <TVNavigationProvider />
               {children}
               <Analytics />
             </NetflixAuthGate>

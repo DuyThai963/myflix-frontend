@@ -54,6 +54,52 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement>(null);
+  const modalContainerRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  // 🎮 XỬ LÝ ĐIỀU HƯỚNG REMOTE ANDROID TV / MÁY CHIẾU: BẮT PHÍM BACK / ESCAPE
+  useEffect(() => {
+    if (!movie) return;
+
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 27: Escape, 4: Back Key (Android TV/Box), 10009: Back (Samsung Tizen), 461: Back (LG webOS)
+      if (e.key === "Escape" || e.keyCode === 27 || e.keyCode === 4 || e.keyCode === 10009 || e.keyCode === 461) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Tự động focus vào tập phim đang phát hoặc nút điều khiển để remote TV có thể điều hướng ngay lập tức
+    const timer = setTimeout(() => {
+      if (!modalContainerRef.current) return;
+      const activeEpBtn = modalContainerRef.current.querySelector<HTMLElement>("button[data-active-episode='true']");
+      const firstEpBtn = modalContainerRef.current.querySelector<HTMLElement>("button[data-episode-btn='true']");
+      const closeBtn = modalContainerRef.current.querySelector<HTMLElement>("button[data-modal-close='true']");
+
+      if (activeEpBtn) {
+        activeEpBtn.focus();
+      } else if (firstEpBtn) {
+        firstEpBtn.focus();
+      } else if (closeBtn) {
+        closeBtn.focus();
+      }
+    }, 180);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === "function") {
+        try {
+          previousActiveElementRef.current.focus();
+        } catch {}
+      }
+    };
+  }, [movie, onClose]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -145,11 +191,14 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
 
   return (
     <motion.div 
+      data-tv-modal="true"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
       className={`fixed inset-0 z-50 flex items-center justify-center select-none overflow-hidden transition-all duration-300 ${isMaximized ? "bg-black p-0" : "bg-black/90 p-0 md:p-6 backdrop-blur-md"}`}
     >
+      {/* [Design Read] Precision modal shell with auto-focused episode list, tactile focus rings for D-Pad remotes, and instant dismissal on TV Back key. */}
       <motion.div 
+        ref={modalContainerRef}
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
         onClick={(e) => e.stopPropagation()} 
         className={`bg-[#141414] w-full h-full overflow-hidden flex flex-col relative shadow-[0_0_60px_rgba(0,0,0,0.95)] transition-all duration-300 ${isMaximized ? "rounded-none border-none max-w-none" : "md:h-[90vh] md:max-w-5xl md:rounded-xl border border-zinc-800/80"}`}
@@ -162,9 +211,10 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
           style={{ top: 'max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.4rem))' }}
         >
           <button 
+            data-modal-maximize="true"
             onClick={() => setIsMaximized(!isMaximized)}
             title={isMaximized ? "Thu nhỏ về cửa sổ" : "Mở rộng vừa khung hình (Chế độ rạp chiếu)"}
-            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm"
+            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-110 active:scale-95"
           >
             {isMaximized ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -184,9 +234,10 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
           </button>
 
           <button 
+            data-modal-close="true"
             onClick={onClose}
             title="Đóng"
-            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-base md:text-lg transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm"
+            className="bg-black/75 hover:bg-zinc-800 text-white w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-base md:text-lg transition duration-200 cursor-pointer border border-zinc-700/60 hover:border-zinc-400 shadow-md backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:scale-110 active:scale-95"
           >
             ✕
           </button>
@@ -194,9 +245,14 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
 
         {/* Khối Trình phát Video (Custom HLS Player hoặc IFrame Embed Dự Phòng) */}
         <div className={`w-full bg-black relative shrink-0 overflow-hidden transition-all duration-300 ${isMaximized ? "h-[80vh] sm:h-[84vh] md:h-[88vh] lg:h-[90vh]" : "h-[38vh] sm:h-[42vh] md:h-[48vh] lg:h-[52vh]"}`}>
-          {streamUrl ? (
+          {loading ? (
+            <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 bg-black">
+              <div className="w-10 h-10 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin mb-3" />
+              <p className="text-xs text-zinc-400 animate-pulse">Đang kết nối máy chủ phim...</p>
+            </div>
+          ) : streamUrl ? (
             <VideoPlayer 
-              key={`${movie.id}-${activeEpisode}`}
+              key={`${movie.id}-${activeEpisode}-${activeServer}-${isEmbedMode ? 'embed' : 'hls'}`}
               src={streamUrl} 
               movieId={`${movie.id}-${activeEpisode}`} 
               movieTitle={fullMovieDetail?.title || fullMovieDetail?.name || movie.title || (movie as any).name || ""}
@@ -211,9 +267,10 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               isEmbed={isEmbedMode}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50">
+            <div className="w-full h-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-900/50 p-6">
               <span className="text-4xl mb-2">⚠️</span>
-              <p className="text-sm px-4 text-center">Nguồn phát hiện tại chưa khả dụng hoặc chỉ có Trailer</p>
+              <p className="text-sm px-4 text-center font-medium text-zinc-300 mb-2">Nguồn phát này hiện tại chưa khả dụng hoặc đang cập nhật</p>
+              <p className="text-xs text-zinc-500 text-center">Mẹo: Bạn có thể đổi sang Server khác trên thanh điều hướng hoặc chọn bản dịch khác bên dưới</p>
             </div>
           )}
         </div>
@@ -299,7 +356,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                             });
                           }
                         }} 
-                        className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
+                        className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 active:scale-95 ${activeServer === server.server_name ? "bg-red-600 border-red-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"}`}
                       >
                         {server.server_name}
                       </button>
@@ -350,7 +407,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                         });
                       }
                     }}
-                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${isEmbedMode ? "bg-amber-600 border-amber-500 text-white font-black" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 active:scale-95 ${isEmbedMode ? "bg-amber-600 border-amber-500 text-white font-black" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
                   >
                     EMBED
                   </button>
@@ -394,7 +451,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                         });
                       }
                     }}
-                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer ${!isEmbedMode ? "bg-red-600/90 border-red-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
+                    className={`px-3 py-1 text-xs font-bold uppercase rounded border transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 active:scale-95 ${!isEmbedMode ? "bg-red-600/90 border-red-600 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-600"}`}
                   >
                     M3U8 HLS
                   </button>
@@ -405,7 +462,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
               <div className={`${isMaximized ? "mb-4" : "mb-6"} flex items-center gap-3 relative`}>
                 <button
                   onClick={toggleMyList}
-                  className={`flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-md font-bold transition border border-zinc-700 hover:border-white ${isMaximized ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"}`}
+                  className={`flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-md font-bold transition border border-zinc-700 hover:border-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 active:scale-95 ${isMaximized ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"}`}
                 >
                   {isInMyList ? (
                     <>
@@ -429,7 +486,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       setShowShareMenu((prev) => !prev);
                     }}
                     title="Chia sẻ phim"
-                    className={`flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition border border-zinc-700 hover:border-white cursor-pointer active:scale-95 ${isMaximized ? "w-7 h-7" : "w-9 h-9"}`}
+                    className={`flex items-center justify-center bg-zinc-800/80 hover:bg-zinc-700 text-white rounded-full transition border border-zinc-700 hover:border-white cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 ${isMaximized ? "w-7 h-7" : "w-9 h-9"}`}
                   >
                     <svg className={`${isMaximized ? "w-3.5 h-3.5" : "w-4 h-4"} text-zinc-200`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="18" cy="5" r="3" />
@@ -454,7 +511,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       <button
                         type="button"
                         onClick={handleCopyLink}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white focus:outline-none focus-visible:bg-zinc-800 focus-visible:text-white transition text-left cursor-pointer"
                       >
                         {copied ? (
                           <>
@@ -476,7 +533,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       <button
                         type="button"
                         onClick={handleShareFacebook}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-blue-600/20 hover:text-blue-400 transition text-left cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-blue-600/20 hover:text-blue-400 focus:outline-none focus-visible:bg-blue-600/20 focus-visible:text-blue-400 transition text-left cursor-pointer"
                       >
                         <svg className="w-4 h-4 text-[#1877F2] fill-current shrink-0" viewBox="0 0 24 24">
                           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -488,7 +545,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       <button
                         type="button"
                         onClick={handleShareMessenger}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-sky-600/20 hover:text-sky-400 transition text-left cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-sky-600/20 hover:text-sky-400 focus:outline-none focus-visible:bg-sky-600/20 focus-visible:text-sky-400 transition text-left cursor-pointer"
                       >
                         <svg className="w-4 h-4 text-[#00B2FF] fill-current shrink-0" viewBox="0 0 24 24">
                           <path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.093.303 2.252.464 3.443.464 6.627 0 12-4.974 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26 6.559-6.963 3.13 3.259 5.889-3.259-6.56 6.963z"/>
@@ -501,7 +558,7 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                         <button
                           type="button"
                           onClick={handleNativeShare}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left cursor-pointer border-t border-zinc-800/80 mt-1"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white focus:outline-none focus-visible:bg-zinc-800 focus-visible:text-white transition text-left cursor-pointer border-t border-zinc-800/80 mt-1"
                         >
                           <svg className="w-4 h-4 text-zinc-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -544,6 +601,8 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                       <button
                         key={idx}
                         disabled={!isPlayable}
+                        data-episode-btn="true"
+                        data-active-episode={activeEpisode === ep.slug ? "true" : undefined}
                         onClick={() => {
                           if (urlToPlay) {
                             if (movie) {
@@ -557,10 +616,17 @@ export default function MovieModal({ movie, onClose, initialTime = 0, isWatchPar
                             alert("Tập này không có link stream!");
                           }
                         }}
-                        className={`py-2 px-1 rounded text-xs font-bold transition truncate cursor-pointer ${
+                        onFocus={(e) => {
+                          try {
+                            e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                          } catch {
+                            e.currentTarget.scrollIntoView();
+                          }
+                        }}
+                        className={`py-2 px-1 rounded text-xs font-bold transition truncate cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:scale-105 focus-visible:z-10 active:scale-95 ${
                           !isPlayable ? "opacity-20 cursor-not-allowed bg-zinc-900" :
                           activeEpisode === ep.slug
-                            ? "bg-red-600 text-white"
+                            ? "bg-red-600 text-white ring-2 ring-red-400/50 shadow-md"
                             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white"
                         }`}
                       >

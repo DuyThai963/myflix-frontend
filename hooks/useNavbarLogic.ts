@@ -129,7 +129,10 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
 
   // 🌍 Theo dõi cuộn trang và nhấp chuột ra ngoài để thu gọn Dropdown
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 20;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+    };
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -142,7 +145,7 @@ export function useNavbarLogic(keyword: string, setKeyword: (value: string) => v
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       window.removeEventListener("scroll", handleScroll);

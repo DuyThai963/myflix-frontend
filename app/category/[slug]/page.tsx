@@ -1,13 +1,14 @@
 "use client";
 
+// [Design Read] Clean dark cinematic grid layout for dynamic categories with instant 0ms pre-fetched pagination and accessible TV D-pad focus states.
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MovieCard from "@/components/MovieCard";
 import MovieModal from "@/components/MovieModal";
 import { Movie } from "@/types/movie";
-import { movieService } from "@/services/movie.service";
 import { useServer } from "@/context/ServerContext";
-import { useEffect, useState, use } from "react";
+import { useState, use } from "react";
+import { usePrefetchPagination } from "@/hooks/usePrefetchPagination";
 
 const categoryNames: Record<string, string> = {
   "phim-moi": "Phim Mới Cập Nhật",
@@ -17,6 +18,12 @@ const categoryNames: Record<string, string> = {
   "phim-chieu-rap": "Phim Chiếu Rạp",
   "hanh-dong": "Phim Hành Động",
   "kinh-di": "Phim Kinh Dị",
+  "tinh-cam": "Phim Tình Cảm",
+  "hai-huoc": "Phim Hài Hước",
+  "co-trang": "Phim Cổ Trang",
+  "tam-ly": "Phim Tâm Lý",
+  "hinh-su": "Phim Hình Sự",
+  "vien-tuong": "Phim Viễn Tưởng",
 };
 
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -24,48 +31,21 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const { slug } = resolvedParams;
   const { currentServerId } = useServer();
 
-  const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [keyword, setKeyword] = useState("");
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
 
   const displayName = categoryNames[slug] || "Thể loại phim";
 
-  const fetchCategoryMovies = async (pageNum: number) => {
-    setLoading(true);
-    try {
-      const data = await movieService.getMoviesByCategory(slug, pageNum, currentServerId);
-      
-      if (data && data.length > 0) {
-        // Nếu là trang 1 thì thay mới, nếu trang > 1 thì cộng dồn
-        setMovies(prev => pageNum === 1 ? data : [...prev, ...data]);
-        
-        // Nếu API trả về ít hơn số lượng mặc định (thường là 20), nghĩa là hết phim
-        if (data.length < 10) setHasMore(false);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error("Lỗi khi tải thể loại:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reset dữ liệu khi đổi thể loại hoặc đổi server
-  useEffect(() => {
-    setPage(1);
-    setHasMore(true);
-    fetchCategoryMovies(1);
-  }, [slug, currentServerId]);
-
-  const handleLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchCategoryMovies(nextPage);
-  };
+  const {
+    movies,
+    loading,
+    hasMore,
+    handleLoadMore,
+    sentinelRef,
+  } = usePrefetchPagination({
+    categorySlug: slug,
+    currentServerId,
+  });
 
   return (
     <main className="bg-black min-h-screen text-white flex flex-col">
@@ -82,13 +62,13 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
           ))}
         </div>
 
-        {/* Nút Tải thêm */}
+        {/* Nút Xem thêm - Tự động tải trước dữ liệu ngầm khi lướt gần tới, click hiển thị 0ms */}
         {hasMore && (
-          <div className="flex justify-center mt-12 mb-8">
+          <div ref={sentinelRef} className="flex justify-center mt-12 mb-8">
             <button
               onClick={handleLoadMore}
               disabled={loading}
-              className="bg-red-600 text-white px-8 py-2 rounded-md font-bold hover:bg-red-700 transition disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="bg-red-600 text-white px-8 py-2.5 rounded-md font-bold hover:bg-red-700 transition disabled:bg-zinc-800 disabled:text-zinc-500 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:scale-105 active:scale-95 shadow-lg"
             >
               {loading ? (
                 <div className="flex items-center gap-2">

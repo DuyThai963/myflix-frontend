@@ -52,10 +52,11 @@ export default function HeroBanner({ movie, onSelectMovie }: Props) {
           {movie.description}
         </p>
 
+        {/* [Design Read] High-impact cinematic CTA buttons with prominent TV remote focus rings and active scale feedback. */}
         <div className="flex items-center gap-3 md:gap-4">
           <button 
             onClick={() => onSelectMovie?.(movie)}
-            className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 py-2.5 sm:py-3 rounded-md transition-all duration-200 hover:bg-zinc-200 active:scale-95 cursor-pointer font-bold border-none outline-none shadow-xl"
+            className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 py-2.5 sm:py-3 rounded-md transition-all duration-200 hover:bg-zinc-200 active:scale-95 cursor-pointer font-bold border-none outline-none shadow-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-red-600 focus-visible:scale-105"
           >
             <BsFillPlayFill size={26} className="text-black" />
             <span className="text-sm sm:text-base uppercase tracking-wider">Play</span>
@@ -63,7 +64,7 @@ export default function HeroBanner({ movie, onSelectMovie }: Props) {
 
           <button 
             onClick={() => onSelectMovie?.(movie)}
-            className="flex items-center justify-center gap-2 bg-zinc-600/70 hover:bg-zinc-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-md font-semibold transition backdrop-blur-sm active:scale-95 cursor-pointer text-sm sm:text-base"
+            className="flex items-center justify-center gap-2 bg-zinc-600/70 hover:bg-zinc-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-md font-semibold transition backdrop-blur-sm active:scale-95 cursor-pointer text-sm sm:text-base focus:outline-none focus-visible:ring-4 focus-visible:ring-white focus-visible:scale-105"
           >
             <AiOutlineInfoCircle size={20} />
             <span>More Info</span>

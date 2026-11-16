@@ -33,6 +33,7 @@ export default function MovieRow({
 
       {/* Nút cuộn trái - Chỉ hiện khi hover vào hàng */}
       <button
+        tabIndex={-1}
         onClick={() => scroll("left")}
         className="absolute left-2 top-[55%] -translate-y-1/2 z-40 bg-black/60 hover:bg-black w-10 h-32 text-white hidden md:flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
       >
@@ -41,14 +42,17 @@ export default function MovieRow({
 
       {/* Nút cuộn phải - Chỉ hiện khi hover vào hàng */}
       <button
+        tabIndex={-1}
         onClick={() => scroll("right")}
         className="absolute right-2 top-[55%] -translate-y-1/2 z-40 bg-black/60 hover:bg-black w-10 h-32 text-white hidden md:flex items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
       >
         ›
       </button>
 
+      {/* [Design Read] Dynamic horizontal stream row with smooth spatial navigation snap points and native mouse scroll. */}
       <div
         ref={rowRef}
+        data-tv-row="true"
         className="flex gap-4 overflow-x-auto scroll-smooth pb-10 pt-4 overscroll-x-contain"
         style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
       >
